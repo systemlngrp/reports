@@ -1,0 +1,54 @@
+{
+  "firms": [
+    { "id": "firm-1", "name": "Firm 1", "port": "9000" },
+    { "id": "firm-2", "name": "Firm 2", "port": "9001" },
+    { "id": "firm-3", "name": "Firm 3", "port": "9002" },
+    { "id": "firm-4", "name": "Firm 4", "port": "9003" }
+  ],
+  "salesHistory": [
+    {
+      "id": "sample-1",
+      "firm": "Firm 1",
+      "date": "2026-08-01",
+      "debtor": "Arun Traders",
+      "invoiceNo": "S-1001",
+      "item": "Steel Bolt",
+      "partNo": "SB-12",
+      "qty": 25,
+      "rate": 18.5,
+      "amount": 462.5,
+      "source": "sample"
+    },
+    {
+      "id": "sample-2",
+      "firm": "Firm 2",
+      "date": "2026-08-03",
+      "debtor": "Metro Hardware",
+      "invoiceNo": "S-2084",
+      "item": "Bearing Set",
+      "partNo": "BR-44",
+      "qty": 8,
+      "rate": 425,
+      "amount": 3400,
+      "source": "sample"
+    },
+    {
+      "id": "sample-3",
+      "firm": "Firm 3",
+      "date": "2026-08-05",
+      "debtor": "Ravi Motors",
+      "invoiceNo": "S-3099",
+      "item": "Gear Plate",
+      "partNo": "GP-9",
+      "qty": 14,
+      "rate": 210,
+      "amount": 2940,
+      "source": "sample"
+    }
+  ],
+  "voucherHistory": {
+    "sales": [],
+    "receipts": [],
+    "creditNotes": []
+  }
+}
