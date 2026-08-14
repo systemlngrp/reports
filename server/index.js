@@ -6,12 +6,14 @@ import {
   appendCreditNoteHistory,
   appendReceiptHistory,
   appendSalesHistory,
+  createFirm,
+  deleteFirm,
   ensureSchema,
   getCreditNoteHistory,
   getFirms,
   getReceiptHistory,
   getSalesHistory,
-  saveFirms,
+  updateFirm,
 } from './store.js'
 import { fetchVoucherData, testTallyConnection } from './tally.js'
 
@@ -40,10 +42,27 @@ app.get('/api/firms', async (_req, res) => {
 
 app.post('/api/firms', async (req, res) => {
   try {
-    const firms = validateFirms(req.body.firms || [])
-    res.json(await saveFirms(firms))
+    const firm = validateFirm(req.body)
+    res.status(201).json(await createFirm(firm))
   } catch (error) {
     res.status(400).json({ message: error.message })
+  }
+})
+
+app.put('/api/firms/:id', async (req, res) => {
+  try {
+    const firm = validateFirm(req.body)
+    res.json(await updateFirm(req.params.id, firm))
+  } catch (error) {
+    res.status(error.message === 'Firm not found.' ? 404 : 400).json({ message: error.message })
+  }
+})
+
+app.delete('/api/firms/:id', async (req, res) => {
+  try {
+    res.json(await deleteFirm(req.params.id))
+  } catch (error) {
+    res.status(error.message === 'Firm not found.' ? 404 : 400).json({ message: error.message })
   }
 })
 
@@ -130,15 +149,16 @@ app.get(/.*/, (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
 })
 
-function validateFirms(firms) {
-  if (!Array.isArray(firms)) throw new Error('Firm list is required.')
-  if (firms.length > 4) throw new Error('Only four firms are supported.')
+function validateFirm(firm) {
+  if (!firm || typeof firm !== 'object') throw new Error('Firm details are required.')
+  const name = String(firm.name || '').trim()
+  if (!name) throw new Error('Firm name is required.')
 
-  return firms.map((firm, index) => ({
-    id: firm.id || `firm-${index + 1}`,
+  return {
+    id: firm.id,
     name: String(firm.name || '').trim(),
     port: validatePort(firm.port),
-  }))
+  }
 }
 
 function saveVoucherRecords(type, records) {

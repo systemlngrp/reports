@@ -11,12 +11,14 @@ import {
   History,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   PlugZap,
   Receipt,
   RefreshCw,
   Save,
   Search,
   ShoppingCart,
+  Trash2,
   XCircle,
 } from 'lucide-react'
 import './App.css'
@@ -216,14 +218,18 @@ function App() {
           <>
             {active === 'dashboard' && (
               <Dashboard
+                creditNoteHistory={creditNoteHistory}
                 firms={firms}
-                history={salesHistory}
-                totals={totals}
+                onNavigate={navigate}
+                receiptHistory={receiptHistory}
+                salesHistory={salesHistory}
               />
             )}
-            {active === 'sales' && <SalesData rows={salesHistory} />}
-            {active === 'receipts' && <VoucherHistory title="Receipts Report" rows={receiptHistory} />}
-            {active === 'credit-notes' && <VoucherHistory title="Credit Notes Report" rows={creditNoteHistory} />}
+            {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}
+            {active === 'receipts' && <VoucherHistory firms={firms} title="Receipts Report" rows={receiptHistory} />}
+            {active === 'credit-notes' && (
+              <VoucherHistory firms={firms} title="Credit Notes Report" rows={creditNoteHistory} />
+            )}
             {active === 'firms' && <FirmSetup firms={firms} onSaved={setFirms} />}
             {active === 'history' && (
               <SalesHistory
@@ -241,17 +247,31 @@ function App() {
   )
 }
 
-function Dashboard({ firms, history, totals }) {
+function Dashboard({ creditNoteHistory, firms, onNavigate, receiptHistory, salesHistory }) {
   const firmCount = firms.filter((firm) => firm.name && firm.port).length
-  const sampleCount = history.filter((row) => row.source === 'sample').length
+  const sampleCount = salesHistory.filter((row) => row.source === 'sample').length
+  const salesQty = salesHistory.reduce((sum, row) => sum + Number(row.qty || 0), 0)
+  const salesAmount = salesHistory.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const receiptAmount = receiptHistory.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const creditNoteAmount = creditNoteHistory.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  const recentSales = salesHistory.slice(0, 5)
+  const recentReceipts = receiptHistory.slice(0, 5)
+  const recentCreditNotes = creditNoteHistory.slice(0, 5)
 
   return (
     <section className="stack">
       <div className="metric-grid">
-        <Metric label="Configured firms" value={`${firmCount}/4`} />
-        <Metric label="Sales rows" value={history.length} />
-        <Metric label="Filtered quantity" value={formatNumber(totals.qty)} />
-        <Metric label="Filtered amount" value={formatCurrency(totals.amount)} />
+        <Metric label="Configured firms" value={firmCount} />
+        <Metric label="Sales rows" value={salesHistory.length} />
+        <Metric label="Receipts rows" value={receiptHistory.length} />
+        <Metric label="Credit note rows" value={creditNoteHistory.length} />
+      </div>
+
+      <div className="metric-grid compact">
+        <Metric label="Sales quantity" value={formatNumber(salesQty)} />
+        <Metric label="Sales amount" value={formatCurrency(salesAmount)} />
+        <Metric label="Receipts amount" value={formatCurrency(receiptAmount)} />
+        <Metric label="Credit note amount" value={formatCurrency(creditNoteAmount)} />
       </div>
 
       {sampleCount > 0 && (
@@ -260,26 +280,197 @@ function Dashboard({ firms, history, totals }) {
           message={`${sampleCount} sample sales rows are included so the UI works before live Tally data is fetched.`}
         />
       )}
+
+      <div className="dashboard-grid">
+        <DashboardSummary
+          action="Open Sales"
+          amount={salesAmount}
+          count={salesHistory.length}
+          detail={`${formatNumber(salesQty)} qty`}
+          onOpen={() => onNavigate('sales')}
+          title="Sales"
+        />
+        <DashboardSummary
+          action="Open Receipts"
+          amount={receiptAmount}
+          count={receiptHistory.length}
+          detail="Receipt vouchers"
+          onOpen={() => onNavigate('receipts')}
+          title="Receipts"
+        />
+        <DashboardSummary
+          action="Open Credit Notes"
+          amount={creditNoteAmount}
+          count={creditNoteHistory.length}
+          detail="Credit note vouchers"
+          onOpen={() => onNavigate('credit-notes')}
+          title="Credit Notes"
+        />
+        <FirmSummary firms={firms} onOpen={() => onNavigate('firms')} />
+      </div>
+
+      <div className="dashboard-grid wide">
+        <div className="panel table-panel">
+          <DashboardSalesTable rows={recentSales} />
+        </div>
+        <div className="panel table-panel">
+          <DashboardVoucherTable rows={recentReceipts} title="Recent Receipts" />
+        </div>
+        <div className="panel table-panel">
+          <DashboardVoucherTable rows={recentCreditNotes} title="Recent Credit Notes" />
+        </div>
+      </div>
     </section>
   )
 }
 
-function SalesData({ rows }) {
+function DashboardSummary({ action, amount, count, detail, onOpen, title }) {
+  return (
+    <div className="panel summary-panel">
+      <div>
+        <h2>{title}</h2>
+        <p>{detail}</p>
+      </div>
+      <div className="summary-list">
+        <span>Rows</span>
+        <strong>{count}</strong>
+        <span>Amount</span>
+        <strong>{formatCurrency(amount)}</strong>
+      </div>
+      <button className="secondary-button" onClick={onOpen} type="button">
+        {action}
+      </button>
+    </div>
+  )
+}
+
+function FirmSummary({ firms, onOpen }) {
+  const configured = firms.filter((firm) => firm.name && firm.port)
+  const missingPort = firms.filter((firm) => firm.name && !firm.port).length
+
+  return (
+    <div className="panel summary-panel">
+      <div>
+        <h2>Firms</h2>
+        <p>{configured.length} ready for Tally fetch</p>
+      </div>
+      <div className="summary-list">
+        <span>Saved</span>
+        <strong>{firms.length}</strong>
+        <span>Missing port</span>
+        <strong>{missingPort}</strong>
+      </div>
+      <button className="secondary-button" onClick={onOpen} type="button">
+        Open Firms
+      </button>
+    </div>
+  )
+}
+
+function DashboardSalesTable({ rows }) {
+  return (
+    <>
+      <div className="table-heading">
+        <h2>Recent Sales</h2>
+      </div>
+      <div className="table-wrap">
+        <table className="dashboard-table">
+          <thead>
+            <tr>
+              <th>Firm</th>
+              <th>Date</th>
+              <th>Invoice</th>
+              <th>Item</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.firm}</td>
+                  <td>{row.date}</td>
+                  <td>{row.invoiceNo}</td>
+                  <td>{row.item}</td>
+                  <td className="num">{formatCurrency(row.amount)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5">No sales rows found.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function DashboardVoucherTable({ rows, title }) {
+  return (
+    <>
+      <div className="table-heading">
+        <h2>{title}</h2>
+      </div>
+      <div className="table-wrap">
+        <table className="dashboard-table">
+          <thead>
+            <tr>
+              <th>Firm</th>
+              <th>Date</th>
+              <th>Party</th>
+              <th>Voucher</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.firm}</td>
+                  <td>{row.date}</td>
+                  <td>{row.party}</td>
+                  <td>{row.voucherNo}</td>
+                  <td className="num">{formatCurrency(row.amount)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5">No voucher rows found.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
+function SalesData({ firms, rows }) {
+  const [firm, setFirm] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      const matchFirm = firm === 'all' || row.firm === firm
       const matchFrom = !fromDate || row.date >= fromDate
       const matchTo = !toDate || row.date <= toDate
-      return matchFrom && matchTo
+      return matchFirm && matchFrom && matchTo
     })
-  }, [fromDate, rows, toDate])
+  }, [firm, fromDate, rows, toDate])
 
   useEffect(() => {
     setPage(1)
-  }, [fromDate, toDate])
+  }, [firm, fromDate, toDate])
+
+  function clearFilters() {
+    setFirm('all')
+    setFromDate('')
+    setToDate('')
+  }
 
   const totals = useMemo(() => {
     const amount = filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
@@ -312,6 +503,17 @@ function SalesData({ rows }) {
       <div className="panel">
         <div className="form-grid">
           <label>
+            Firm
+            <select value={firm} onChange={(event) => setFirm(event.target.value)}>
+              <option value="all">All Firms</option>
+              {firms.filter(hasFirmName).map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             From Date
             <input value={fromDate} onChange={(event) => setFromDate(event.target.value)} type="date" />
           </label>
@@ -319,6 +521,11 @@ function SalesData({ rows }) {
             To Date
             <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
           </label>
+          <div className="filter-actions">
+            <button className="secondary-button" onClick={clearFilters} type="button">
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
@@ -363,17 +570,25 @@ function SalesData({ rows }) {
   )
 }
 
-function VoucherHistory({ title, rows }) {
+function VoucherHistory({ firms, title, rows }) {
+  const [firm, setFirm] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
+      const matchFirm = firm === 'all' || row.firm === firm
       const matchFrom = !fromDate || row.date >= fromDate
       const matchTo = !toDate || row.date <= toDate
-      return matchFrom && matchTo
+      return matchFirm && matchFrom && matchTo
     })
-  }, [fromDate, rows, toDate])
+  }, [firm, fromDate, rows, toDate])
+
+  function clearFilters() {
+    setFirm('all')
+    setFromDate('')
+    setToDate('')
+  }
 
   const totalAmount = useMemo(() => {
     return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
@@ -390,6 +605,17 @@ function VoucherHistory({ title, rows }) {
       <div className="panel">
         <div className="form-grid">
           <label>
+            Firm
+            <select value={firm} onChange={(event) => setFirm(event.target.value)}>
+              <option value="all">All Firms</option>
+              {firms.filter(hasFirmName).map((item) => (
+                <option key={item.id} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             From Date
             <input value={fromDate} onChange={(event) => setFromDate(event.target.value)} type="date" />
           </label>
@@ -397,6 +623,11 @@ function VoucherHistory({ title, rows }) {
             To Date
             <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
           </label>
+          <div className="filter-actions">
+            <button className="secondary-button" onClick={clearFilters} type="button">
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
@@ -414,9 +645,9 @@ function VoucherHistory({ title, rows }) {
 }
 
 function FirmSetup({ firms, onSaved }) {
-  const [draft, setDraft] = useState(firms)
+  const [draft, setDraft] = useState([])
   const [statuses, setStatuses] = useState({})
-  const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState({})
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -429,21 +660,74 @@ function FirmSetup({ firms, onSaved }) {
     )
   }
 
-  async function save() {
-    setSaving(true)
+  function addFirm() {
+    const id = `draft-${Date.now()}`
+    setDraft((current) => [...current, { id, name: '', port: '', isNew: true }])
+    setMessage('')
+  }
+
+  async function saveFirm(firm) {
+    setBusy((current) => ({ ...current, [firm.id]: 'saving' }))
     setMessage('')
     try {
-      const saved = await apiPost('/api/firms', { firms: draft })
-      onSaved(saved)
-      setMessage('Firm settings saved.')
+      const payload = { name: firm.name, port: firm.port }
+      const saved = firm.isNew
+        ? await apiPost('/api/firms', payload)
+        : await apiPut(`/api/firms/${firm.id}`, payload)
+
+      setDraft((current) => current.map((item) => (item.id === firm.id ? saved : item)))
+      if (firm.isNew) {
+        onSaved([...firms, saved])
+      } else {
+        onSaved(firms.map((item) => (item.id === saved.id ? saved : item)))
+      }
+      setStatuses((current) => {
+        const next = { ...current }
+        delete next[firm.id]
+        return next
+      })
+      setMessage('Firm saved.')
     } catch (requestError) {
       setMessage(requestError.message)
     } finally {
-      setSaving(false)
+      setBusy((current) => ({ ...current, [firm.id]: '' }))
+    }
+  }
+
+  async function deleteSelectedFirm(firm) {
+    setMessage('')
+    if (firm.isNew) {
+      setDraft((current) => current.filter((item) => item.id !== firm.id))
+      return
+    }
+
+    setBusy((current) => ({ ...current, [firm.id]: 'deleting' }))
+    try {
+      await apiDelete(`/api/firms/${firm.id}`)
+      setDraft((current) => current.filter((item) => item.id !== firm.id))
+      onSaved(firms.filter((item) => item.id !== firm.id))
+      setStatuses((current) => {
+        const next = { ...current }
+        delete next[firm.id]
+        return next
+      })
+      setMessage('Firm deleted.')
+    } catch (requestError) {
+      setMessage(requestError.message)
+    } finally {
+      setBusy((current) => ({ ...current, [firm.id]: '' }))
     }
   }
 
   async function testFirm(firm) {
+    if (firm.isNew) {
+      setStatuses((current) => ({
+        ...current,
+        [firm.id]: { ok: false, message: 'Save this firm before testing.' },
+      }))
+      return
+    }
+
     setStatuses((current) => ({ ...current, [firm.id]: { busy: true, message: 'Testing...' } }))
     try {
       const result = await apiPost(`/api/firms/${firm.id}/test`, {})
@@ -457,25 +741,36 @@ function FirmSetup({ firms, onSaved }) {
     <section className="stack">
       <div className="panel split-panel">
         <div>
-          <h2>Four Tally Firms</h2>
-          <p>Set each firm name and the Tally HTTP port number used on this PC.</p>
+          <h2>Tally Firms</h2>
+          <p>Add each firm name and the Tally HTTP port number used on this PC.</p>
         </div>
-        <button className="primary-button" onClick={save} disabled={saving} type="button">
-          <Save size={18} />
-          {saving ? 'Saving...' : 'Save Firms'}
+        <button className="primary-button" onClick={addFirm} type="button">
+          <Plus size={18} />
+          Add Firm
         </button>
       </div>
 
-      {message && <Banner tone={message.includes('saved') ? 'success' : 'danger'} message={message} />}
+      {message && (
+        <Banner tone={message.includes('saved') || message.includes('deleted') ? 'success' : 'danger'} message={message} />
+      )}
+
+      {!draft.length && (
+        <StatePanel
+          icon={<Building2 size={28} />}
+          title="No firms added"
+          copy="Add a firm to save its name and Tally port number."
+        />
+      )}
 
       <div className="firm-grid">
         {draft.map((firm, index) => {
           const status = statuses[firm.id]
+          const action = busy[firm.id]
           return (
             <div className="panel firm-card" key={firm.id}>
               <div className="firm-heading">
                 <Building2 size={20} />
-                <strong>Firm {index + 1}</strong>
+                <strong>{firm.name || `Firm ${index + 1}`}</strong>
               </div>
               <label>
                 Firm Name
@@ -489,10 +784,35 @@ function FirmSetup({ firms, onSaved }) {
                   onChange={(event) => updateFirm(index, 'port', event.target.value)}
                 />
               </label>
-              <button className="secondary-button" onClick={() => testFirm(firm)} type="button">
-                <PlugZap size={17} />
-                Test Connection
-              </button>
+              <div className="firm-actions">
+                <button
+                  className="primary-button"
+                  disabled={Boolean(action)}
+                  onClick={() => saveFirm(firm)}
+                  type="button"
+                >
+                  <Save size={17} />
+                  {action === 'saving' ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={Boolean(action)}
+                  onClick={() => testFirm(firm)}
+                  type="button"
+                >
+                  <PlugZap size={17} />
+                  Test
+                </button>
+                <button
+                  className="danger-button"
+                  disabled={Boolean(action)}
+                  onClick={() => deleteSelectedFirm(firm)}
+                  type="button"
+                >
+                  <Trash2 size={17} />
+                  {action === 'deleting' ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
               {status && (
                 <div className={status.ok ? 'status-text ok' : 'status-text failed'}>
                   {status.ok ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
@@ -510,6 +830,10 @@ function FirmSetup({ firms, onSaved }) {
 function SalesHistory({ firms, filters, rows, setFilters, totals }) {
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }))
+  }
+
+  function clearFilters() {
+    setFilters(emptyFilters)
   }
 
   function exportCsv() {
@@ -547,7 +871,7 @@ function SalesHistory({ firms, filters, rows, setFilters, totals }) {
             Firm
             <select value={filters.firm} onChange={(event) => updateFilter('firm', event.target.value)}>
               <option value="all">All Firms</option>
-              {firms.map((firm) => (
+              {firms.filter(hasFirmName).map((firm) => (
                 <option key={firm.id} value={firm.name}>
                   {firm.name}
                 </option>
@@ -574,6 +898,11 @@ function SalesHistory({ firms, filters, rows, setFilters, totals }) {
             Item
             <input value={filters.item} onChange={(event) => updateFilter('item', event.target.value)} />
           </label>
+          <div className="filter-actions">
+            <button className="secondary-button" onClick={clearFilters} type="button">
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
@@ -719,6 +1048,20 @@ async function apiPost(url, body) {
   return parseResponse(response)
 }
 
+async function apiPut(url, body) {
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return parseResponse(response)
+}
+
+async function apiDelete(url) {
+  const response = await fetch(url, { method: 'DELETE' })
+  return parseResponse(response)
+}
+
 async function parseResponse(response) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.message || 'Request failed.')
@@ -727,6 +1070,10 @@ async function parseResponse(response) {
 
 function includesText(value, query) {
   return String(value || '').toLowerCase().includes(String(query || '').toLowerCase())
+}
+
+function hasFirmName(firm) {
+  return Boolean(String(firm.name || '').trim())
 }
 
 function formatCurrency(value) {

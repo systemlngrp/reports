@@ -1,6 +1,6 @@
 # Report
 
-Local React + Node app for fetching Tally data from four configured firms.
+Local React + Node app for fetching Tally data from configured firms.
 
 ## Run
 
@@ -23,7 +23,7 @@ http://localhost:4000
 
 ## Tally Setup
 
-In the app, open `Firms` and set four firm names and port numbers. Tally must be running on the same Windows PC, with HTTP/XML access available on those ports.
+In the app, open `Firms` and add each firm name with its Tally HTTP port number. Tally must be running on the same Windows PC, with HTTP/XML access available on those ports.
 
 ## Hostinger Database
 

@@ -268,7 +268,7 @@
 }
 
 .metric-grid.compact {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .metric {
@@ -292,8 +292,45 @@
   color: var(--accent-strong);
 }
 
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-grid.wide {
+  grid-template-columns: 1fr;
+}
+
+.summary-panel {
+  display: grid;
+  gap: 16px;
+  align-content: space-between;
+}
+
+.summary-list {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.summary-list span {
+  color: #697586;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summary-list strong {
+  color: var(--accent-strong);
+  text-align: right;
+}
+
 .primary-button,
 .secondary-button,
+.danger-button,
 .menu-button,
 .icon-button {
   border: 0;
@@ -319,7 +356,8 @@
 }
 
 .primary-button:disabled,
-.secondary-button:disabled {
+.secondary-button:disabled,
+.danger-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -329,6 +367,13 @@
   padding: 9px 12px;
   color: var(--accent-strong);
   background: var(--accent-soft);
+}
+
+.danger-button {
+  min-height: 38px;
+  padding: 9px 12px;
+  color: #b42318;
+  background: #fff1f0;
 }
 
 .menu-button {
@@ -385,6 +430,12 @@
   grid-template-columns: repeat(6, minmax(130px, 1fr));
 }
 
+.filter-actions {
+  align-self: end;
+  display: flex;
+  gap: 10px;
+}
+
 label {
   color: #344054;
   display: grid;
@@ -435,6 +486,12 @@ button:focus-visible {
   color: var(--accent);
 }
 
+.firm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .status-text {
   font-size: 13px;
   font-weight: 700;
@@ -451,6 +508,15 @@ button:focus-visible {
 .table-panel {
   padding: 0;
   overflow: hidden;
+}
+
+.table-heading {
+  padding: 16px 18px 0;
+}
+
+.table-heading h2 {
+  margin: 0;
+  font-size: 18px;
 }
 
 .table-wrap {
@@ -491,6 +557,10 @@ table {
   width: 100%;
 }
 
+.dashboard-table {
+  min-width: 760px;
+}
+
 th,
 td {
   border-bottom: 1px solid #e4eaf2;
@@ -529,6 +599,7 @@ td.num {
   }
 
   .nav-list,
+  .dashboard-grid,
   .metric-grid,
   .metric-grid.compact,
   .firm-grid,

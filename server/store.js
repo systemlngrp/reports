@@ -64,11 +64,6 @@ export async function ensureSchema() {
 
   await removePresetData(db)
 
-  const [rows] = await db.query('SELECT COUNT(*) AS count FROM firms')
-  if (Number(rows[0].count) === 0) {
-    await saveFirms(createEmptyFirms())
-  }
-
   return { mode: 'mysql' }
 }
 
@@ -87,14 +82,6 @@ async function createVoucherTable(db, tableName) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `)
-}
-
-function createEmptyFirms() {
-  return Array.from({ length: 4 }, (_item, index) => ({
-    id: `firm-${index + 1}`,
-    name: '',
-    port: '',
-  }))
 }
 
 async function removePresetData(db) {
@@ -116,24 +103,51 @@ export async function getFirms() {
   return rows
 }
 
-export async function saveFirms(firms) {
-  const normalized = firms.slice(0, 4).map((firm, index) => ({
-    id: firm.id || `firm-${index + 1}`,
-    name: String(firm.name || '').trim(),
-    port: String(firm.port || '').trim(),
-  }))
-
+export async function createFirm(firm) {
   const db = getPool()
+  const normalized = normalizeFirm({
+    ...firm,
+    id: `firm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  })
 
-  await db.query('DELETE FROM firms')
-  for (const firm of normalized) {
-    await db.query('INSERT INTO firms (id, name, port) VALUES (?, ?, ?)', [
-      firm.id,
-      firm.name,
-      firm.port,
-    ])
+  await db.query('INSERT INTO firms (id, name, port) VALUES (?, ?, ?)', [
+    normalized.id,
+    normalized.name,
+    normalized.port,
+  ])
+  return normalized
+}
+
+export async function updateFirm(id, firm) {
+  const db = getPool()
+  const normalized = normalizeFirm({ ...firm, id })
+
+  const [result] = await db.query('UPDATE firms SET name = ?, port = ? WHERE id = ?', [
+    normalized.name,
+    normalized.port,
+    normalized.id,
+  ])
+  if (result.affectedRows === 0) {
+    throw new Error('Firm not found.')
   }
   return normalized
+}
+
+export async function deleteFirm(id) {
+  const db = getPool()
+  const [result] = await db.query('DELETE FROM firms WHERE id = ?', [id])
+  if (result.affectedRows === 0) {
+    throw new Error('Firm not found.')
+  }
+  return { id }
+}
+
+function normalizeFirm(firm) {
+  return {
+    id: String(firm.id || '').trim(),
+    name: String(firm.name || '').trim(),
+    port: String(firm.port || '').trim(),
+  }
 }
 
 export async function getSalesHistory() {
