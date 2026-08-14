@@ -64,6 +64,7 @@ const pagePaths = {
 
 const routeAliases = {
   '/': 'dashboard',
+  '/dasboard': 'dashboard',
   '/dashbaord': 'dashboard',
   '/dashboard': 'dashboard',
   '/sales': 'sales',
