@@ -31,6 +31,11 @@ const navItems = [
 ]
 
 const voucherScreens = {
+  sales: {
+    title: 'Sales',
+    copy: 'Fetch sales vouchers from selected Tally firms and save item rows into history.',
+    endpoint: '/api/tally/sales/fetch',
+  },
   receipts: {
     title: 'Receipts',
     copy: 'Fetch receipt vouchers from selected Tally firms and review connection results.',
@@ -228,7 +233,14 @@ function App() {
                 totals={totals}
               />
             )}
-            {active === 'sales' && <SalesData rows={salesHistory} />}
+            {active === 'sales' && (
+              <SalesData
+                config={voucherScreens.sales}
+                firms={firms}
+                onFetched={loadInitialData}
+                rows={salesHistory}
+              />
+            )}
             {['receipts', 'credit-notes'].includes(active) && (
               <VoucherFetchScreen
                 config={voucherScreens[active]}
@@ -276,7 +288,7 @@ function Dashboard({ firms, history, totals }) {
   )
 }
 
-function SalesData({ rows }) {
+function SalesData({ config, firms, onFetched, rows }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
@@ -315,6 +327,14 @@ function SalesData({ rows }) {
 
   return (
     <section className="stack">
+      <VoucherFetchScreen config={config} firms={firms} onFetched={onFetched} />
+
+      <div className="panel split-panel">
+        <div>
+          <h2>Sales Report</h2>
+        </div>
+      </div>
+
       <div className="panel">
         <div className="form-grid">
           <label>

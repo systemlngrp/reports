@@ -1,6 +1,6 @@
-# Sales Data Fetch
+# Tally Data Fetch
 
-This Python script fetches Sales vouchers from local Tally and saves item rows into the MySQL `sales_history` table.
+These Python scripts fetch vouchers from local Tally and save rows into MySQL.
 
 ## Setup
 
@@ -29,4 +29,16 @@ Fetch one firm only:
 
 ```bash
 python fetch_sales.py --firm-id firm-1
+```
+
+Fetch receipts:
+
+```bash
+python fetch_receipts.py --from-date 2026-08-01 --to-date 2026-08-14
+```
+
+Fetch credit notes:
+
+```bash
+python fetch_credit_notes.py --from-date 2026-08-01 --to-date 2026-08-14
 ```
