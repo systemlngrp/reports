@@ -64,6 +64,8 @@ export async function ensureSchema() {
     )
   `)
 
+  await removePresetData(db)
+
   const [rows] = await db.query('SELECT COUNT(*) AS count FROM firms')
   if (Number(rows[0].count) === 0) {
     const fallback = await readFallback()
@@ -71,6 +73,18 @@ export async function ensureSchema() {
   }
 
   return { mode: 'mysql' }
+}
+
+async function removePresetData(db) {
+  await db.query("DELETE FROM sales_history WHERE source = 'sample' OR id LIKE 'sample-%'")
+  await db.query(`
+    UPDATE firms
+    SET name = '', port = ''
+    WHERE (id = 'firm-1' AND name = 'Firm 1' AND port = '9000')
+      OR (id = 'firm-2' AND name = 'Firm 2' AND port = '9001')
+      OR (id = 'firm-3' AND name = 'Firm 3' AND port = '9002')
+      OR (id = 'firm-4' AND name = 'Firm 4' AND port = '9003')
+  `)
 }
 
 export async function getFirms() {

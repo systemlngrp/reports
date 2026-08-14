@@ -44,6 +44,39 @@ const voucherScreens = {
   },
 }
 
+const pageThemes = {
+  dashboard: 'theme-blue',
+  sales: 'theme-red',
+  receipts: 'theme-cyan',
+  'credit-notes': 'theme-blue-red',
+  firms: 'theme-cyan-red',
+  history: 'theme-blue-cyan',
+}
+
+const pagePaths = {
+  dashboard: '/dashbaord',
+  sales: '/Sales',
+  receipts: '/receipt',
+  'credit-notes': '/creditnote',
+  firms: '/firms',
+  history: '/history',
+}
+
+const routeAliases = {
+  '/': 'dashboard',
+  '/dashbaord': 'dashboard',
+  '/dashboard': 'dashboard',
+  '/sales': 'sales',
+  '/Sales': 'sales',
+  '/receipt': 'receipts',
+  '/receipts': 'receipts',
+  '/creditnote': 'credit-notes',
+  '/creditnotes': 'credit-notes',
+  '/credit-notes': 'credit-notes',
+  '/firms': 'firms',
+  '/history': 'history',
+}
+
 const emptyFilters = {
   firm: 'all',
   fromDate: '',
@@ -54,7 +87,7 @@ const emptyFilters = {
 }
 
 function App() {
-  const [active, setActive] = useState('dashboard')
+  const [active, setActive] = useState(getPageFromPath)
   const [firms, setFirms] = useState([])
   const [salesHistory, setSalesHistory] = useState([])
   const [filters, setFilters] = useState(emptyFilters)
@@ -65,6 +98,23 @@ function App() {
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  useEffect(() => {
+    function handleRouteChange() {
+      setActive(getPageFromPath())
+    }
+
+    window.addEventListener('popstate', handleRouteChange)
+    return () => window.removeEventListener('popstate', handleRouteChange)
+  }, [])
+
+  function navigate(page) {
+    setActive(page)
+    const nextPath = pagePaths[page]
+    if (nextPath && window.location.pathname !== nextPath) {
+      window.history.pushState({}, '', nextPath)
+    }
+  }
 
   async function loadInitialData() {
     setLoading(true)
@@ -104,7 +154,7 @@ function App() {
   }, [filteredHistory])
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${pageThemes[active]}`}>
       <aside className="sidebar">
         <div className="brand">
           <FileText size={28} />
@@ -121,7 +171,7 @@ function App() {
               <button
                 className={active === item.id ? 'nav-item active' : 'nav-item'}
                 key={item.id}
-                onClick={() => setActive(item.id)}
+                onClick={() => navigate(item.id)}
                 type="button"
                 title={item.label}
               >
@@ -162,7 +212,7 @@ function App() {
                 firms={firms}
                 history={salesHistory}
                 totals={totals}
-                onOpenHistory={() => setActive('history')}
+                onOpenHistory={() => navigate('history')}
               />
             )}
             {['sales', 'receipts', 'credit-notes'].includes(active) && (
@@ -595,6 +645,10 @@ function formatNumber(value) {
 
 function csvValue(value) {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+function getPageFromPath() {
+  return routeAliases[window.location.pathname] || 'dashboard'
 }
 
 export default App
