@@ -27,11 +27,6 @@ const navItems = [
 ]
 
 const voucherScreens = {
-  sales: {
-    title: 'Sales',
-    copy: 'Fetch sales vouchers from selected Tally firms and save item rows into history.',
-    endpoint: '/api/tally/sales/fetch',
-  },
   receipts: {
     title: 'Receipts',
     copy: 'Fetch receipt vouchers from selected Tally firms and review connection results.',
@@ -215,7 +210,8 @@ function App() {
                 totals={totals}
               />
             )}
-            {['sales', 'receipts', 'credit-notes'].includes(active) && (
+            {active === 'sales' && <SalesData rows={salesHistory} />}
+            {['receipts', 'credit-notes'].includes(active) && (
               <VoucherFetchScreen
                 config={voucherScreens[active]}
                 firms={firms}
@@ -258,6 +254,52 @@ function Dashboard({ firms, history, totals }) {
           message={`${sampleCount} sample sales rows are included so the UI works before live Tally data is fetched.`}
         />
       )}
+    </section>
+  )
+}
+
+function SalesData({ rows }) {
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchFrom = !fromDate || row.date >= fromDate
+      const matchTo = !toDate || row.date <= toDate
+      return matchFrom && matchTo
+    })
+  }, [fromDate, rows, toDate])
+
+  const totals = useMemo(() => {
+    const amount = filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+    const qty = filteredRows.reduce((sum, row) => sum + Number(row.qty || 0), 0)
+    return { amount, qty }
+  }, [filteredRows])
+
+  return (
+    <section className="stack">
+      <div className="panel">
+        <div className="form-grid">
+          <label>
+            From Date
+            <input value={fromDate} onChange={(event) => setFromDate(event.target.value)} type="date" />
+          </label>
+          <label>
+            To Date
+            <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
+          </label>
+        </div>
+      </div>
+
+      <div className="metric-grid compact">
+        <Metric label="Rows" value={filteredRows.length} />
+        <Metric label="Qty" value={formatNumber(totals.qty)} />
+        <Metric label="Amount" value={formatCurrency(totals.amount)} />
+      </div>
+
+      <div className="panel table-panel">
+        <SalesRowsTable rows={filteredRows} />
+      </div>
     </section>
   )
 }
@@ -523,48 +565,56 @@ function SalesHistory({ firms, filters, rows, setFilters, totals }) {
       </div>
 
       <div className="panel table-panel">
-        {rows.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Firm</th>
-                  <th>Date</th>
-                  <th>Debtor</th>
-                  <th>Invoice No</th>
-                  <th>Item</th>
-                  <th>Part No</th>
-                  <th>Qty</th>
-                  <th>Rate</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.firm}</td>
-                    <td>{row.date}</td>
-                    <td>{row.debtor}</td>
-                    <td>{row.invoiceNo}</td>
-                    <td>{row.item}</td>
-                    <td>{row.partNo}</td>
-                    <td className="num">{formatNumber(row.qty)}</td>
-                    <td className="num">{formatCurrency(row.rate)}</td>
-                    <td className="num">{formatCurrency(row.amount)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <StatePanel
-            icon={<Search size={28} />}
-            title="No rows match the filters"
-            copy="Clear filters or fetch sales data from Tally to build the history."
-          />
-        )}
+        <SalesRowsTable rows={rows} />
       </div>
     </section>
+  )
+}
+
+function SalesRowsTable({ rows }) {
+  if (!rows.length) {
+    return (
+      <StatePanel
+        icon={<Search size={28} />}
+        title="No rows found"
+        copy="No sales rows match the selected dates."
+      />
+    )
+  }
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Firm</th>
+            <th>Date</th>
+            <th>Debtor</th>
+            <th>Invoice No</th>
+            <th>Item</th>
+            <th>Part No</th>
+            <th>Qty</th>
+            <th>Rate</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td>{row.firm}</td>
+              <td>{row.date}</td>
+              <td>{row.debtor}</td>
+              <td>{row.invoiceNo}</td>
+              <td>{row.item}</td>
+              <td>{row.partNo}</td>
+              <td className="num">{formatNumber(row.qty)}</td>
+              <td className="num">{formatCurrency(row.rate)}</td>
+              <td className="num">{formatCurrency(row.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

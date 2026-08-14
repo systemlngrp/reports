@@ -22,42 +22,34 @@ def main() -> int:
     parser.add_argument("--from-date", default="", help="Start date in YYYY-MM-DD format. Defaults to today.")
     parser.add_argument("--to-date", default="", help="End date in YYYY-MM-DD format. Defaults to today.")
     parser.add_argument("--firm-id", default="", help="Fetch one firm only, for example firm-1.")
+    parser.add_argument("--timeout", type=int, default=60, help="Tally request timeout in seconds.")
     args = parser.parse_args()
 
     load_env(ENV_FILE)
-    connection = mysql.connector.connect(
-        host=required_env("DB_HOST"),
-        port=int(os.getenv("DB_PORT", "3306")),
-        user=required_env("DB_USER"),
-        password=os.getenv("DB_PASSWORD", ""),
-        database=required_env("DB_NAME"),
-    )
+    db_config = get_db_config()
 
-    try:
-        ensure_sales_table(connection)
-        firms = get_firms(connection, args.firm_id)
-        if not firms:
-            print("No firms found. Add firm name and Tally port first.")
-            return 0
-
-        total_saved = 0
-        for firm in firms:
-            if not firm["name"] or not firm["port"]:
-                print(f"Skipping {firm['id']}: firm name or port is blank.")
-                continue
-
-            try:
-                records = fetch_sales_for_firm(firm, args.from_date, args.to_date)
-                save_sales_records(connection, records)
-                total_saved += len(records)
-                print(f"{firm['name']}: saved {len(records)} sales rows.")
-            except Exception as error:
-                print(f"{firm['name'] or firm['id']}: {error}")
-
-        print(f"Done. Total saved rows: {total_saved}")
+    ensure_sales_table(db_config)
+    firms = get_firms(db_config, args.firm_id)
+    if not firms:
+        print("No firms found. Add firm name and Tally port first.")
         return 0
-    finally:
-        connection.close()
+
+    total_saved = 0
+    for firm in firms:
+        if not firm["name"] or not firm["port"]:
+            print(f"Skipping {firm['id']}: firm name or port is blank.")
+            continue
+
+        try:
+            records = fetch_sales_for_firm(firm, args.from_date, args.to_date, args.timeout)
+            save_sales_records(db_config, records)
+            total_saved += len(records)
+            print(f"{firm['name']}: saved {len(records)} sales rows.")
+        except Exception as error:
+            print(f"{firm['name'] or firm['id']}: {error}")
+
+    print(f"Done. Total saved rows: {total_saved}")
+    return 0
 
 
 def load_env(path: Path) -> None:
@@ -79,43 +71,66 @@ def required_env(key: str) -> str:
     return value
 
 
-def ensure_sales_table(connection) -> None:
+def get_db_config() -> dict[str, object]:
+    return {
+        "host": required_env("DB_HOST"),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "user": required_env("DB_USER"),
+        "password": os.getenv("DB_PASSWORD", ""),
+        "database": required_env("DB_NAME"),
+        "connection_timeout": 20,
+    }
+
+
+def ensure_sales_table(config: dict[str, object]) -> None:
+    connection = mysql.connector.connect(**config)
     cursor = connection.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sales_history (
-          id VARCHAR(64) PRIMARY KEY,
-          firm VARCHAR(255) NOT NULL,
-          date DATE NULL,
-          debtor VARCHAR(255) DEFAULT '',
-          invoice_no VARCHAR(255) DEFAULT '',
-          item VARCHAR(255) DEFAULT '',
-          part_no VARCHAR(255) DEFAULT '',
-          qty DECIMAL(14, 3) DEFAULT 0,
-          rate DECIMAL(14, 3) DEFAULT 0,
-          amount DECIMAL(14, 2) DEFAULT 0,
-          source VARCHAR(50) DEFAULT 'tally',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    try:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sales_history (
+              id VARCHAR(64) PRIMARY KEY,
+              firm VARCHAR(255) NOT NULL,
+              date DATE NULL,
+              debtor VARCHAR(255) DEFAULT '',
+              invoice_no VARCHAR(255) DEFAULT '',
+              item VARCHAR(255) DEFAULT '',
+              part_no VARCHAR(255) DEFAULT '',
+              qty DECIMAL(14, 3) DEFAULT 0,
+              rate DECIMAL(14, 3) DEFAULT 0,
+              amount DECIMAL(14, 2) DEFAULT 0,
+              source VARCHAR(50) DEFAULT 'tally',
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
-    connection.commit()
-    cursor.close()
+        connection.commit()
+    finally:
+        cursor.close()
+        connection.close()
 
 
-def get_firms(connection, firm_id: str) -> list[dict[str, str]]:
+def get_firms(config: dict[str, object], firm_id: str) -> list[dict[str, str]]:
+    connection = mysql.connector.connect(**config)
     cursor = connection.cursor(dictionary=True)
-    if firm_id:
-        cursor.execute("SELECT id, name, port FROM firms WHERE id = %s ORDER BY id", (firm_id,))
-    else:
-        cursor.execute("SELECT id, name, port FROM firms ORDER BY id")
-    rows = cursor.fetchall()
-    cursor.close()
-    return rows
+    try:
+        if firm_id:
+            cursor.execute("SELECT id, name, port FROM firms WHERE id = %s ORDER BY id", (firm_id,))
+        else:
+            cursor.execute("SELECT id, name, port FROM firms ORDER BY id")
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        connection.close()
 
 
-def fetch_sales_for_firm(firm: dict[str, str], from_date: str, to_date: str) -> list[dict[str, object]]:
-    xml = post_to_tally(firm["port"], build_sales_request(from_date, to_date))
+def fetch_sales_for_firm(
+    firm: dict[str, str],
+    from_date: str,
+    to_date: str,
+    timeout: int,
+) -> list[dict[str, object]]:
+    xml = post_to_tally(firm["port"], build_sales_request(from_date, to_date), timeout)
     root = ET.fromstring(clean_xml(xml))
     vouchers = [element for element in root.iter() if strip_ns(element.tag).upper() == "VOUCHER"]
 
@@ -125,7 +140,7 @@ def fetch_sales_for_firm(firm: dict[str, str], from_date: str, to_date: str) -> 
     return records
 
 
-def post_to_tally(port: str, body: str) -> str:
+def post_to_tally(port: str, body: str, timeout: int) -> str:
     request = urllib.request.Request(
         f"http://localhost:{port}",
         data=body.encode("utf-8"),
@@ -133,7 +148,7 @@ def post_to_tally(port: str, body: str) -> str:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=12) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.read().decode("utf-8", errors="replace")
     except urllib.error.URLError as error:
         raise RuntimeError(f"Could not connect to Tally on port {port}. {error}") from error
@@ -252,33 +267,37 @@ def normalize_date(value: str) -> str | None:
     return value or None
 
 
-def save_sales_records(connection, records: list[dict[str, object]]) -> None:
+def save_sales_records(config: dict[str, object], records: list[dict[str, object]]) -> None:
     if not records:
         return
 
+    connection = mysql.connector.connect(**config)
     cursor = connection.cursor()
-    cursor.executemany(
-        """
-        INSERT INTO sales_history
-          (id, firm, date, debtor, invoice_no, item, part_no, qty, rate, amount, source)
-        VALUES
-          (%(id)s, %(firm)s, %(date)s, %(debtor)s, %(invoice_no)s, %(item)s, %(part_no)s,
-           %(qty)s, %(rate)s, %(amount)s, %(source)s)
-        ON DUPLICATE KEY UPDATE
-          firm = VALUES(firm),
-          date = VALUES(date),
-          debtor = VALUES(debtor),
-          item = VALUES(item),
-          part_no = VALUES(part_no),
-          qty = VALUES(qty),
-          rate = VALUES(rate),
-          amount = VALUES(amount),
-          source = VALUES(source)
-        """,
-        records,
-    )
-    connection.commit()
-    cursor.close()
+    try:
+        cursor.executemany(
+            """
+            INSERT INTO sales_history
+              (id, firm, date, debtor, invoice_no, item, part_no, qty, rate, amount, source)
+            VALUES
+              (%(id)s, %(firm)s, %(date)s, %(debtor)s, %(invoice_no)s, %(item)s, %(part_no)s,
+               %(qty)s, %(rate)s, %(amount)s, %(source)s)
+            ON DUPLICATE KEY UPDATE
+              firm = VALUES(firm),
+              date = VALUES(date),
+              debtor = VALUES(debtor),
+              item = VALUES(item),
+              part_no = VALUES(part_no),
+              qty = VALUES(qty),
+              rate = VALUES(rate),
+              amount = VALUES(amount),
+              source = VALUES(source)
+            """,
+            records,
+        )
+        connection.commit()
+    finally:
+        cursor.close()
+        connection.close()
 
 
 if __name__ == "__main__":
