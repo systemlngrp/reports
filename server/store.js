@@ -1,16 +1,13 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import mysql from 'mysql2/promise'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const dataFile = path.join(__dirname, 'data', 'fallback-data.json')
-
-const hasDatabase = Boolean(process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME)
 let pool
 
 function getPool() {
-  if (!hasDatabase) return null
+  const missing = ['DB_HOST', 'DB_USER', 'DB_NAME'].filter((key) => !process.env[key])
+  if (missing.length) {
+    throw new Error(`Missing MySQL configuration: ${missing.join(', ')}`)
+  }
+
   if (!pool) {
     pool = mysql.createPool({
       host: process.env.DB_HOST,
@@ -25,18 +22,8 @@ function getPool() {
   return pool
 }
 
-async function readFallback() {
-  const text = await fs.readFile(dataFile, 'utf8')
-  return JSON.parse(text)
-}
-
-async function writeFallback(data) {
-  await fs.writeFile(dataFile, `${JSON.stringify(data, null, 2)}\n`)
-}
-
 export async function ensureSchema() {
   const db = getPool()
-  if (!db) return { mode: 'local-json' }
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS firms (
@@ -68,11 +55,18 @@ export async function ensureSchema() {
 
   const [rows] = await db.query('SELECT COUNT(*) AS count FROM firms')
   if (Number(rows[0].count) === 0) {
-    const fallback = await readFallback()
-    await saveFirms(fallback.firms)
+    await saveFirms(createEmptyFirms())
   }
 
   return { mode: 'mysql' }
+}
+
+function createEmptyFirms() {
+  return Array.from({ length: 4 }, (_item, index) => ({
+    id: `firm-${index + 1}`,
+    name: '',
+    port: '',
+  }))
 }
 
 async function removePresetData(db) {
@@ -89,10 +83,6 @@ async function removePresetData(db) {
 
 export async function getFirms() {
   const db = getPool()
-  if (!db) {
-    const data = await readFallback()
-    return data.firms
-  }
 
   const [rows] = await db.query('SELECT id, name, port FROM firms ORDER BY id')
   return rows
@@ -106,12 +96,6 @@ export async function saveFirms(firms) {
   }))
 
   const db = getPool()
-  if (!db) {
-    const data = await readFallback()
-    data.firms = normalized
-    await writeFallback(data)
-    return normalized
-  }
 
   await db.query('DELETE FROM firms')
   for (const firm of normalized) {
@@ -126,10 +110,6 @@ export async function saveFirms(firms) {
 
 export async function getSalesHistory() {
   const db = getPool()
-  if (!db) {
-    const data = await readFallback()
-    return data.salesHistory
-  }
 
   const [rows] = await db.query(`
     SELECT
@@ -154,12 +134,6 @@ export async function appendSalesHistory(records) {
   if (!records.length) return []
 
   const db = getPool()
-  if (!db) {
-    const data = await readFallback()
-    data.salesHistory = [...records, ...data.salesHistory]
-    await writeFallback(data)
-    return records
-  }
 
   for (const row of records) {
     await db.query(

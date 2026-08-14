@@ -213,7 +213,6 @@ function App() {
                 firms={firms}
                 history={salesHistory}
                 totals={totals}
-                onOpenHistory={() => navigate('history')}
               />
             )}
             {['sales', 'receipts', 'credit-notes'].includes(active) && (
@@ -240,7 +239,7 @@ function App() {
   )
 }
 
-function Dashboard({ firms, history, totals, onOpenHistory }) {
+function Dashboard({ firms, history, totals }) {
   const firmCount = firms.filter((firm) => firm.name && firm.port).length
   const sampleCount = history.filter((row) => row.source === 'sample').length
 
@@ -251,20 +250,6 @@ function Dashboard({ firms, history, totals, onOpenHistory }) {
         <Metric label="Sales rows" value={history.length} />
         <Metric label="Filtered quantity" value={formatNumber(totals.qty)} />
         <Metric label="Filtered amount" value={formatCurrency(totals.amount)} />
-      </div>
-
-      <div className="panel split-panel">
-        <div>
-          <h2>Tally workflow</h2>
-          <p>
-            Configure firm names and ports, test the local Tally connection, then fetch Sales,
-            Receipts, or Credit Notes. Sales item rows are saved into Tally Sales Data History.
-          </p>
-        </div>
-        <button className="primary-button" onClick={onOpenHistory} type="button">
-          <History size={18} />
-          Open History
-        </button>
       </div>
 
       {sampleCount > 0 && (
