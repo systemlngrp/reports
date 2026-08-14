@@ -90,6 +90,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(true)
 
   useEffect(() => {
     loadInitialData()
@@ -150,7 +151,7 @@ function App() {
   }, [filteredHistory])
 
   return (
-    <div className={`app-shell ${pageThemes[active]}`}>
+    <div className={`app-shell ${pageThemes[active]} ${menuOpen ? '' : 'menu-collapsed'}`}>
       <aside className="sidebar">
         <div className="brand">
           <FileText size={28} />
@@ -185,7 +186,25 @@ function App() {
             <small>{health?.storeMode || 'checking'}</small>
           </div>
         </div>
+
+        <button
+          className="menu-toggle"
+          onClick={() => setMenuOpen((current) => !current)}
+          type="button"
+        >
+          Hide Menu
+        </button>
       </aside>
+
+      {!menuOpen && (
+        <button
+          className="menu-toggle floating"
+          onClick={() => setMenuOpen(true)}
+          type="button"
+        >
+          Show Menu
+        </button>
+      )}
 
       <main className="workspace">
         <header className="topbar">
