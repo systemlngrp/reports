@@ -3,7 +3,15 @@ import { fileURLToPath } from 'node:url'
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import { appendSalesHistory, ensureSchema, getFirms, getSalesHistory, saveFirms } from './store.js'
+import {
+  appendCreditNoteHistory,
+  appendReceiptHistory,
+  appendSalesHistory,
+  ensureSchema,
+  getFirms,
+  getSalesHistory,
+  saveFirms,
+} from './store.js'
 import { fetchVoucherData, testTallyConnection } from './tally.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -14,10 +22,11 @@ const distPath = path.join(__dirname, '..', 'dist')
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }))
 app.use(express.json({ limit: '2mb' }))
 
-let storeMode = 'local-json'
+let storeMode = 'starting'
+let startupError = ''
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, storeMode })
+  res.status(startupError ? 503 : 200).json({ ok: !startupError, storeMode, message: startupError })
 })
 
 app.get('/api/firms', async (_req, res) => {
@@ -80,10 +89,8 @@ app.post('/api/tally/:type/fetch', async (req, res) => {
           fromDate: req.body.fromDate,
           toDate: req.body.toDate,
         })
-        if (normalizedType === 'sales') {
-          const appended = await appendSalesHistory(result.records)
-          savedRecords = [...savedRecords, ...appended]
-        }
+        const appended = await saveVoucherRecords(normalizedType, result.records)
+        savedRecords = [...savedRecords, ...appended]
         results.push({ firmId: firm.id, firm: firm.name, ok: true, ...result })
       } catch (error) {
         results.push({ firmId: firm.id, firm: firm.name, ok: false, message: error.message })
@@ -97,6 +104,10 @@ app.post('/api/tally/:type/fetch', async (req, res) => {
 })
 
 app.use(express.static(distPath))
+
+app.get('/favicon.ico', (_req, res) => {
+  res.redirect(301, '/favicon.svg')
+})
 
 app.get(/.*/, (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'))
@@ -113,6 +124,13 @@ function validateFirms(firms) {
   }))
 }
 
+function saveVoucherRecords(type, records) {
+  if (type === 'sales') return appendSalesHistory(records)
+  if (type === 'receipts') return appendReceiptHistory(records)
+  if (type === 'creditNotes') return appendCreditNoteHistory(records)
+  return []
+}
+
 function validatePort(port) {
   const value = String(port || '').trim()
   if (!/^\d{2,5}$/.test(value)) throw new Error('Port number is required and must be numeric.')
@@ -124,11 +142,14 @@ function validatePort(port) {
 ensureSchema()
   .then((result) => {
     storeMode = result.mode
+  })
+  .catch((error) => {
+    storeMode = 'mysql-error'
+    startupError = error.message
+    console.error('Failed to start Report API:', error)
+  })
+  .finally(() => {
     app.listen(port, () => {
       console.log(`Report API running on http://localhost:${port} using ${storeMode}`)
     })
-  })
-  .catch((error) => {
-    console.error('Failed to start Report API:', error)
-    process.exit(1)
   })

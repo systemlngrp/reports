@@ -51,6 +51,9 @@ export async function ensureSchema() {
     )
   `)
 
+  await createVoucherTable(db, 'receipts_history')
+  await createVoucherTable(db, 'credit_notes_history')
+
   await removePresetData(db)
 
   const [rows] = await db.query('SELECT COUNT(*) AS count FROM firms')
@@ -59,6 +62,23 @@ export async function ensureSchema() {
   }
 
   return { mode: 'mysql' }
+}
+
+async function createVoucherTable(db, tableName) {
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS ${tableName} (
+      id VARCHAR(128) PRIMARY KEY,
+      firm VARCHAR(255) NOT NULL,
+      date DATE NULL,
+      party VARCHAR(255) DEFAULT '',
+      voucher_no VARCHAR(255) DEFAULT '',
+      voucher_type VARCHAR(100) DEFAULT '',
+      amount DECIMAL(14, 2) DEFAULT 0,
+      narration TEXT NULL,
+      source VARCHAR(50) DEFAULT 'tally',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
 }
 
 function createEmptyFirms() {
@@ -161,6 +181,50 @@ export async function appendSalesHistory(records) {
         row.qty,
         row.rate,
         row.amount,
+        row.source || 'tally',
+      ],
+    )
+  }
+
+  return records
+}
+
+export async function appendReceiptHistory(records) {
+  return appendVoucherHistory('receipts_history', records)
+}
+
+export async function appendCreditNoteHistory(records) {
+  return appendVoucherHistory('credit_notes_history', records)
+}
+
+async function appendVoucherHistory(tableName, records) {
+  if (!records.length) return []
+
+  const db = getPool()
+
+  for (const row of records) {
+    await db.query(
+      `INSERT INTO ${tableName}
+        (id, firm, date, party, voucher_no, voucher_type, amount, narration, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        firm = VALUES(firm),
+        date = VALUES(date),
+        party = VALUES(party),
+        voucher_no = VALUES(voucher_no),
+        voucher_type = VALUES(voucher_type),
+        amount = VALUES(amount),
+        narration = VALUES(narration),
+        source = VALUES(source)`,
+      [
+        row.id,
+        row.firm,
+        row.date || null,
+        row.party,
+        row.voucherNo,
+        row.voucherType,
+        row.amount,
+        row.narration,
         row.source || 'tally',
       ],
     )

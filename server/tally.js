@@ -25,24 +25,17 @@ export async function fetchVoucherData({ firm, type, fromDate, toDate }) {
   const parsed = parser.parse(xml)
   const vouchers = collectByKey(parsed, 'VOUCHER')
 
-  if (type !== 'sales') {
-    return {
-      records: [],
-      rawCount: vouchers.length,
-      message: `${voucherType} fetch completed. Detailed table mapping can be extended after live Tally XML is confirmed.`,
-    }
-  }
-
-  const records = vouchers.flatMap((voucher, voucherIndex) =>
-    normalizeSalesVoucher(voucher, firm.name, voucherIndex),
-  )
+  const records =
+    type === 'sales'
+      ? vouchers.flatMap((voucher, voucherIndex) => normalizeSalesVoucher(voucher, firm.name, voucherIndex))
+      : vouchers.map((voucher, voucherIndex) => normalizeVoucher(voucher, firm.name, voucherType, voucherIndex))
 
   return {
     records,
     rawCount: vouchers.length,
     message: records.length
-      ? `Fetched ${records.length} sales item rows from ${firm.name}.`
-      : `Tally responded, but no Sales rows were found for ${firm.name}.`,
+      ? `Fetched ${records.length} ${voucherType} rows from ${firm.name}.`
+      : `Tally responded, but no ${voucherType} rows were found for ${firm.name}.`,
   }
 }
 
@@ -192,6 +185,37 @@ function normalizeSalesVoucher(voucher, firmName, voucherIndex) {
     amount: Math.abs(numberValue(entry.AMOUNT)),
     source: 'tally',
   }))
+}
+
+function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
+  const date = normalizeDate(voucher.DATE)
+  const voucherNo = stringValue(voucher.VOUCHERNUMBER || voucher.REFERENCE || `TALLY-${voucherIndex + 1}`)
+  const party = stringValue(voucher.PARTYLEDGERNAME || voucher.LEDGERNAME || '')
+  const amount = Math.abs(numberValue(voucher.AMOUNT || collectAmount(voucher)))
+
+  return {
+    id: `${firmName}-${voucherType}-${voucherNo}-${voucherIndex}`,
+    firm: firmName,
+    date,
+    party,
+    voucherNo,
+    voucherType,
+    amount,
+    narration: stringValue(voucher.NARRATION || ''),
+    source: 'tally',
+  }
+}
+
+function collectAmount(value) {
+  if (!value || typeof value !== 'object') return 0
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + collectAmount(item), 0)
+
+  let total = 0
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (key.toUpperCase() === 'AMOUNT') total += numberValue(entryValue)
+    else total += collectAmount(entryValue)
+  }
+  return total
 }
 
 function asArray(value) {
