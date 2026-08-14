@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Building2,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   CreditCard,
   Download,
   FileText,
   History,
+  PanelLeftClose,
+  PanelLeftOpen,
   PlugZap,
   Receipt,
   RefreshCw,
@@ -81,6 +85,8 @@ const emptyFilters = {
   invoiceNo: '',
   item: '',
 }
+
+const salesPageSize = 50
 
 function App() {
   const [active, setActive] = useState(getPageFromPath)
@@ -186,25 +192,7 @@ function App() {
             <small>{health?.storeMode || 'checking'}</small>
           </div>
         </div>
-
-        <button
-          className="menu-toggle"
-          onClick={() => setMenuOpen((current) => !current)}
-          type="button"
-        >
-          Hide Menu
-        </button>
       </aside>
-
-      {!menuOpen && (
-        <button
-          className="menu-toggle floating"
-          onClick={() => setMenuOpen(true)}
-          type="button"
-        >
-          Show Menu
-        </button>
-      )}
 
       <main className="workspace">
         <header className="topbar">
@@ -212,9 +200,20 @@ function App() {
             <p className="eyebrow">Local Tally reporting</p>
             <h1>{navItems.find((item) => item.id === active)?.label}</h1>
           </div>
-          <button className="icon-button" onClick={loadInitialData} type="button" title="Refresh data">
-            <RefreshCw size={18} />
-          </button>
+          <div className="topbar-actions">
+            <button
+              className="menu-button"
+              onClick={() => setMenuOpen((current) => !current)}
+              type="button"
+              title={menuOpen ? 'Hide menu' : 'Show menu'}
+            >
+              {menuOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+              {menuOpen ? 'Hide Menu' : 'Show Menu'}
+            </button>
+            <button className="icon-button" onClick={loadInitialData} type="button" title="Refresh data">
+              <RefreshCw size={18} />
+            </button>
+          </div>
         </header>
 
         {error && <Banner tone="danger" message={error} />}
@@ -280,6 +279,7 @@ function Dashboard({ firms, history, totals }) {
 function SalesData({ rows }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [page, setPage] = useState(1)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -289,11 +289,29 @@ function SalesData({ rows }) {
     })
   }, [fromDate, rows, toDate])
 
+  useEffect(() => {
+    setPage(1)
+  }, [fromDate, toDate])
+
   const totals = useMemo(() => {
     const amount = filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
     const qty = filteredRows.reduce((sum, row) => sum + Number(row.qty || 0), 0)
     return { amount, qty }
   }, [filteredRows])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / salesPageSize))
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages))
+  }, [totalPages])
+
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * salesPageSize
+    return filteredRows.slice(start, start + salesPageSize)
+  }, [filteredRows, page])
+
+  const showingStart = filteredRows.length ? (page - 1) * salesPageSize + 1 : 0
+  const showingEnd = Math.min(page * salesPageSize, filteredRows.length)
 
   return (
     <section className="stack">
@@ -317,7 +335,35 @@ function SalesData({ rows }) {
       </div>
 
       <div className="panel table-panel">
-        <SalesRowsTable rows={filteredRows} />
+        <SalesRowsTable rows={paginatedRows} />
+        <div className="pagination-bar">
+          <span>
+            Showing {showingStart}-{showingEnd} of {filteredRows.length}
+          </span>
+          <div className="pagination-controls">
+            <button
+              className="secondary-button"
+              disabled={page === 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              type="button"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+            <strong>
+              Page {page} / {totalPages}
+            </strong>
+            <button
+              className="secondary-button"
+              disabled={page === totalPages}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              type="button"
+            >
+              Next
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   )
