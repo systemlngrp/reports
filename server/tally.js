@@ -172,19 +172,24 @@ function normalizeSalesVoucher(voucher, firmName, voucherIndex) {
     ]
   }
 
-  return entries.map((entry, entryIndex) => ({
-    id: `${firmName}-${invoiceNo}-${voucherIndex}-${entryIndex}`,
-    firm: firmName,
-    date,
-    debtor,
-    invoiceNo,
-    item: stringValue(entry.STOCKITEMNAME),
-    partNo: stringValue(entry.PARTNO || entry.BASICUSERDESCRIPTION || ''),
-    qty: quantityValue(entry.ACTUALQTY || entry.BILLEDQTY),
-    rate: numberValue(entry.RATE),
-    amount: Math.abs(numberValue(entry.AMOUNT)),
-    source: 'tally',
-  }))
+  return entries.map((entry, entryIndex) => {
+    const item = stringValue(entry.STOCKITEMNAME)
+    const qty = quantityValue(entry.ACTUALQTY || entry.BILLEDQTY)
+    const amount = Math.abs(numberValue(entry.AMOUNT))
+    return {
+      id: `${firmName}-${invoiceNo}-${voucherIndex}-${entryIndex}`,
+      firm: firmName,
+      date,
+      debtor,
+      invoiceNo,
+      item,
+      partNo: stringValue(entry.PARTNO || entry.BASICUSERDESCRIPTION || '') || partNoFromItem(item),
+      qty,
+      rate: numberValue(entry.RATE) || calculatedRate(amount, qty),
+      amount,
+      source: 'tally',
+    }
+  })
 }
 
 function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
@@ -232,6 +237,15 @@ function stringValue(value) {
 function numberValue(value) {
   const match = stringValue(value).match(/-?\d+(\.\d+)?/)
   return match ? Number(match[0]) : 0
+}
+
+function calculatedRate(amount, qty) {
+  return amount && qty ? Number((amount / qty).toFixed(3)) : 0
+}
+
+function partNoFromItem(item) {
+  const match = String(item || '').match(/-(\d{4,})\s*$/)
+  return match ? match[1] : ''
 }
 
 function quantityValue(value) {

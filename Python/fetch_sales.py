@@ -221,6 +221,10 @@ def normalize_sales_voucher(voucher: ET.Element, firm_name: str, voucher_index: 
 
     records = []
     for entry_index, entry in enumerate(entries):
+        item = text_of(entry, "STOCKITEMNAME")
+        qty = abs(number_value(text_of(entry, "ACTUALQTY") or text_of(entry, "BILLEDQTY")))
+        amount = abs(number_value(text_of(entry, "AMOUNT")))
+        rate = number_value(text_of(entry, "RATE")) or calculated_rate(amount, qty)
         records.append(
             {
                 "id": f"{firm_name}-{invoice_no}-{voucher_index}-{entry_index}",
@@ -228,11 +232,13 @@ def normalize_sales_voucher(voucher: ET.Element, firm_name: str, voucher_index: 
                 "date": date,
                 "debtor": debtor,
                 "invoice_no": invoice_no,
-                "item": text_of(entry, "STOCKITEMNAME"),
-                "part_no": text_of(entry, "PARTNO") or text_of(entry, "BASICUSERDESCRIPTION"),
-                "qty": abs(number_value(text_of(entry, "ACTUALQTY") or text_of(entry, "BILLEDQTY"))),
-                "rate": number_value(text_of(entry, "RATE")),
-                "amount": abs(number_value(text_of(entry, "AMOUNT"))),
+                "item": item,
+                "part_no": text_of(entry, "PARTNO")
+                or text_of(entry, "BASICUSERDESCRIPTION")
+                or part_no_from_item(item),
+                "qty": qty,
+                "rate": rate,
+                "amount": amount,
                 "source": "tally",
             }
         )
@@ -258,6 +264,15 @@ def strip_ns(tag: str) -> str:
 def number_value(value: str) -> float:
     match = re.search(r"-?\d+(?:\.\d+)?", value or "")
     return float(match.group(0)) if match else 0.0
+
+
+def calculated_rate(amount: float, qty: float) -> float:
+    return round(amount / qty, 3) if amount and qty else 0.0
+
+
+def part_no_from_item(item: str) -> str:
+    match = re.search(r"-(\d{4,})\s*$", item or "")
+    return match.group(1) if match else ""
 
 
 def normalize_date(value: str) -> str | None:
