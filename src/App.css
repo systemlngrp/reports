@@ -413,33 +413,6 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
-.firm-checks {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.check-row {
-  border: 1px solid #d9e2ef;
-  border-radius: 8px;
-  padding: 10px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 6px 10px;
-}
-
-.check-row:has(input:checked) {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.check-row small {
-  color: #667085;
-  grid-column: 2;
-}
-
 .firm-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -452,8 +425,7 @@ button:focus-visible {
 }
 
 .firm-heading,
-.status-text,
-.result-row {
+.status-text {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -468,31 +440,12 @@ button:focus-visible {
   font-weight: 700;
 }
 
-.status-text.ok,
-.result-row.ok svg {
+.status-text.ok {
   color: #039855;
 }
 
-.status-text.failed,
-.result-row.failed svg {
+.status-text.failed {
   color: #d92d20;
-}
-
-.result-list {
-  display: grid;
-  gap: 10px;
-}
-
-.result-row {
-  border: 1px solid #d9e2ef;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.result-row span {
-  color: #667085;
-  display: block;
-  margin-top: 2px;
 }
 
 .table-panel {
@@ -578,7 +531,6 @@ td.num {
   .nav-list,
   .metric-grid,
   .metric-grid.compact,
-  .firm-checks,
   .firm-grid,
   .form-grid,
   .filter-grid {

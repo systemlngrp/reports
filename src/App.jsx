@@ -30,24 +30,6 @@ const navItems = [
   { id: 'history', label: 'Tally Sales Data History', icon: History },
 ]
 
-const voucherScreens = {
-  sales: {
-    title: 'Sales',
-    copy: 'Fetch sales vouchers from selected Tally firms and save item rows into history.',
-    endpoint: '/api/tally/sales/fetch',
-  },
-  receipts: {
-    title: 'Receipts',
-    copy: 'Fetch receipt vouchers from selected Tally firms and review connection results.',
-    endpoint: '/api/tally/receipts/fetch',
-  },
-  'credit-notes': {
-    title: 'Credit Notes',
-    copy: 'Fetch credit note vouchers from selected Tally firms and confirm availability.',
-    endpoint: '/api/tally/credit-notes/fetch',
-  },
-}
-
 const pageThemes = {
   dashboard: 'theme-blue',
   sales: 'theme-red',
@@ -233,21 +215,7 @@ function App() {
                 totals={totals}
               />
             )}
-            {active === 'sales' && (
-              <SalesData
-                config={voucherScreens.sales}
-                firms={firms}
-                onFetched={loadInitialData}
-                rows={salesHistory}
-              />
-            )}
-            {['receipts', 'credit-notes'].includes(active) && (
-              <VoucherFetchScreen
-                config={voucherScreens[active]}
-                firms={firms}
-                onFetched={loadInitialData}
-              />
-            )}
+            {active === 'sales' && <SalesData rows={salesHistory} />}
             {active === 'firms' && <FirmSetup firms={firms} onSaved={setFirms} />}
             {active === 'history' && (
               <SalesHistory
@@ -288,7 +256,7 @@ function Dashboard({ firms, history, totals }) {
   )
 }
 
-function SalesData({ config, firms, onFetched, rows }) {
+function SalesData({ rows }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
@@ -327,8 +295,6 @@ function SalesData({ config, firms, onFetched, rows }) {
 
   return (
     <section className="stack">
-      <VoucherFetchScreen config={config} firms={firms} onFetched={onFetched} />
-
       <div className="panel split-panel">
         <div>
           <h2>Sales Report</h2>
@@ -385,96 +351,6 @@ function SalesData({ config, firms, onFetched, rows }) {
           </div>
         </div>
       </div>
-    </section>
-  )
-}
-
-function VoucherFetchScreen({ config, firms, onFetched }) {
-  const [selected, setSelected] = useState(() => firms.map((firm) => firm.id))
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState(null)
-
-  useEffect(() => {
-    setSelected(firms.map((firm) => firm.id))
-  }, [firms])
-
-  async function fetchVouchers() {
-    setBusy(true)
-    setResult(null)
-    try {
-      const data = await apiPost(config.endpoint, { firmIds: selected, fromDate, toDate })
-      setResult(data)
-      await onFetched()
-    } catch (requestError) {
-      setResult({ error: requestError.message, results: [] })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section className="stack">
-      <div className="panel split-panel">
-        <div>
-          <h2>{config.title}</h2>
-          <p>{config.copy}</p>
-        </div>
-        <button className="primary-button" onClick={fetchVouchers} disabled={busy || !selected.length} type="button">
-          <PlugZap size={18} />
-          {busy ? 'Fetching...' : 'Fetch Tally Data'}
-        </button>
-      </div>
-
-      <div className="panel">
-        <div className="form-grid">
-          <label>
-            From Date
-            <input value={fromDate} onChange={(event) => setFromDate(event.target.value)} type="date" />
-          </label>
-          <label>
-            To Date
-            <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
-          </label>
-        </div>
-
-        <div className="firm-checks">
-          {firms.map((firm) => (
-            <label className="check-row" key={firm.id}>
-              <input
-                checked={selected.includes(firm.id)}
-                onChange={(event) => {
-                  setSelected((current) =>
-                    event.target.checked ? [...current, firm.id] : current.filter((id) => id !== firm.id),
-                  )
-                }}
-                type="checkbox"
-              />
-              <span>{firm.name || firm.id}</span>
-              <small>Port {firm.port || '-'}</small>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {result?.error && <Banner tone="danger" message={result.error} />}
-      {result?.results?.length > 0 && (
-        <div className="panel">
-          <h2>Fetch Results</h2>
-          <div className="result-list">
-            {result.results.map((item) => (
-              <div className={item.ok ? 'result-row ok' : 'result-row failed'} key={item.firmId}>
-                {item.ok ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                <div>
-                  <strong>{item.firm}</strong>
-                  <span>{item.message}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </section>
   )
 }
