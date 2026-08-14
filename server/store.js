@@ -158,6 +158,34 @@ export async function getSalesHistory() {
   return rows
 }
 
+export async function getReceiptHistory() {
+  return getVoucherHistory('receipts_history')
+}
+
+export async function getCreditNoteHistory() {
+  return getVoucherHistory('credit_notes_history')
+}
+
+async function getVoucherHistory(tableName) {
+  const db = getPool()
+
+  const [rows] = await db.query(`
+    SELECT
+      id,
+      firm,
+      DATE_FORMAT(date, '%Y-%m-%d') AS date,
+      party,
+      voucher_no AS voucherNo,
+      voucher_type AS voucherType,
+      amount,
+      narration,
+      source
+    FROM ${tableName}
+    ORDER BY date DESC, voucher_no DESC
+  `)
+  return rows
+}
+
 export async function appendSalesHistory(records) {
   if (!records.length) return []
 

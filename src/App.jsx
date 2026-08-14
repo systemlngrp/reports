@@ -79,6 +79,8 @@ function App() {
   const [active, setActive] = useState(getPageFromPath)
   const [firms, setFirms] = useState([])
   const [salesHistory, setSalesHistory] = useState([])
+  const [receiptHistory, setReceiptHistory] = useState([])
+  const [creditNoteHistory, setCreditNoteHistory] = useState([])
   const [filters, setFilters] = useState(emptyFilters)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -110,14 +112,18 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const [healthData, firmsData, historyData] = await Promise.all([
+      const [healthData, firmsData, historyData, receiptData, creditNoteData] = await Promise.all([
         apiGet('/api/health'),
         apiGet('/api/firms'),
         apiGet('/api/sales-history'),
+        apiGet('/api/receipts-history'),
+        apiGet('/api/credit-notes-history'),
       ])
       setHealth(healthData)
       setFirms(firmsData)
       setSalesHistory(historyData)
+      setReceiptHistory(receiptData)
+      setCreditNoteHistory(creditNoteData)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
@@ -216,6 +222,8 @@ function App() {
               />
             )}
             {active === 'sales' && <SalesData rows={salesHistory} />}
+            {active === 'receipts' && <VoucherHistory title="Receipts Report" rows={receiptHistory} />}
+            {active === 'credit-notes' && <VoucherHistory title="Credit Notes Report" rows={creditNoteHistory} />}
             {active === 'firms' && <FirmSetup firms={firms} onSaved={setFirms} />}
             {active === 'history' && (
               <SalesHistory
@@ -350,6 +358,56 @@ function SalesData({ rows }) {
             </button>
           </div>
         </div>
+      </div>
+    </section>
+  )
+}
+
+function VoucherHistory({ title, rows }) {
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row) => {
+      const matchFrom = !fromDate || row.date >= fromDate
+      const matchTo = !toDate || row.date <= toDate
+      return matchFrom && matchTo
+    })
+  }, [fromDate, rows, toDate])
+
+  const totalAmount = useMemo(() => {
+    return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+  }, [filteredRows])
+
+  return (
+    <section className="stack">
+      <div className="panel split-panel">
+        <div>
+          <h2>{title}</h2>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="form-grid">
+          <label>
+            From Date
+            <input value={fromDate} onChange={(event) => setFromDate(event.target.value)} type="date" />
+          </label>
+          <label>
+            To Date
+            <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
+          </label>
+        </div>
+      </div>
+
+      <div className="metric-grid compact">
+        <Metric label="Rows" value={filteredRows.length} />
+        <Metric label="Amount" value={formatCurrency(totalAmount)} />
+        <Metric label="Source" value="Tally" />
+      </div>
+
+      <div className="panel table-panel">
+        <VoucherRowsTable rows={filteredRows} />
       </div>
     </section>
   )
@@ -571,6 +629,51 @@ function SalesRowsTable({ rows }) {
               <td className="num">{formatNumber(row.qty)}</td>
               <td className="num">{formatCurrency(row.rate)}</td>
               <td className="num">{formatCurrency(row.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function VoucherRowsTable({ rows }) {
+  if (!rows.length) {
+    return (
+      <StatePanel
+        icon={<Search size={28} />}
+        title="No rows found"
+        copy="No voucher rows match the selected dates."
+      />
+    )
+  }
+
+  return (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Firm</th>
+            <th>Date</th>
+            <th>Party</th>
+            <th>Voucher No</th>
+            <th>Voucher Type</th>
+            <th>Amount</th>
+            <th>Narration</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td>{row.firm}</td>
+              <td>{row.date}</td>
+              <td>{row.party}</td>
+              <td>{row.voucherNo}</td>
+              <td>{row.voucherType}</td>
+              <td className="num">{formatCurrency(row.amount)}</td>
+              <td>{row.narration}</td>
+              <td>{row.source}</td>
             </tr>
           ))}
         </tbody>

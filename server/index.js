@@ -7,7 +7,9 @@ import {
   appendReceiptHistory,
   appendSalesHistory,
   ensureSchema,
+  getCreditNoteHistory,
   getFirms,
+  getReceiptHistory,
   getSalesHistory,
   saveFirms,
 } from './store.js'
@@ -60,6 +62,22 @@ app.post('/api/firms/:id/test', async (req, res) => {
 app.get('/api/sales-history', async (_req, res) => {
   try {
     res.json(await getSalesHistory())
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
+app.get('/api/receipts-history', async (_req, res) => {
+  try {
+    res.json(await getReceiptHistory())
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
+app.get('/api/credit-notes-history', async (_req, res) => {
+  try {
+    res.json(await getCreditNoteHistory())
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
