@@ -34,7 +34,7 @@ DB_HOST=
 DB_PORT=3306
 DB_USER=
 DB_PASSWORD=
-DB_NAME=report
+DB_NAME=u380633007_reports
 ```
 
 When `DB_HOST`, `DB_USER`, and `DB_NAME` are set, the backend creates the required `firms` and `sales_history` tables automatically.
