@@ -323,9 +323,7 @@ function normalizeCompanyRow(row, index) {
   const id = String(row.Id || '').trim()
   if (!id) throw new Error(`Company row ${index + 1} is missing Id.`)
   if (!company) throw new Error(`Company row ${index + 1} is missing Company.`)
-  const targetText = String(row.TARGET || '').replace(/[,₹\s]/g, '')
-  const target = targetText ? Number(targetText) : 0
-  if (!Number.isFinite(target)) throw new Error(`Company row ${index + 1} has an invalid TARGET.`)
+  const target = parseSheetAmount(row.TARGET)
   return {
     id, company, address: String(row.Address || '').trim(), district: String(row.District || '').trim(),
     state: String(row.State || '').trim(), gstNo: String(row['GST NO'] || '').trim(),
@@ -333,6 +331,18 @@ function normalizeCompanyRow(row, index) {
     contactNumber: String(row['Contact Number'] || '').trim(), pin: String(row.PIN || '').trim(),
     salesPerson: String(row['Sales Person'] || '').trim(), target, sourceData: row,
   }
+}
+
+function parseSheetAmount(value) {
+  const text = String(value ?? '').trim().toLowerCase()
+  if (!text || ['-', 'n/a', 'na', 'nil', 'none'].includes(text)) return 0
+  const match = text.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/)
+  if (!match) return 0
+  let amount = Number(match[0])
+  if (/\b(?:crore|crores|cr)\b/.test(text)) amount *= 10000000
+  else if (/\b(?:lakh|lakhs|lac|lacs)\b/.test(text)) amount *= 100000
+  if (/^\(.*\)$/.test(text) && amount > 0) amount *= -1
+  return Number.isFinite(amount) ? amount : 0
 }
 
 function syncError(message, code) {
