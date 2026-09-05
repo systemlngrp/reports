@@ -137,7 +137,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
-  const [menuOpen, setMenuOpen] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(() => window.innerWidth > 980)
   const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance'].includes(active), master: active === 'companies', 'target-menu': ['custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
 
   useEffect(() => {
@@ -155,6 +155,7 @@ function App() {
 
   function navigate(page) {
     setActive(page)
+    if (window.innerWidth <= 980) setMenuOpen(false)
     const nextPath = pagePaths[page]
     if (nextPath && window.location.pathname !== nextPath) {
       window.history.pushState({}, '', nextPath)
@@ -211,6 +212,9 @@ function App() {
             <strong>Report</strong>
             <span>Tally Data Center</span>
           </div>
+          <button className="mobile-menu-close" aria-label="Close menu" onClick={() => setMenuOpen(false)} type="button">
+            <XCircle size={20} />
+          </button>
         </div>
 
         <nav className="nav-list" aria-label="Main navigation">
@@ -253,6 +257,8 @@ function App() {
           </div>
         </div>
       </aside>
+
+      {menuOpen && <button className="sidebar-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} type="button" />}
 
       <main className="workspace">
         <header className="topbar">
