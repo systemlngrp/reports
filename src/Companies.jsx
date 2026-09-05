@@ -6,6 +6,8 @@ export default function Companies() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -26,20 +28,24 @@ export default function Companies() {
     return companies.filter((row) => [row.company, row.id, row.district, row.state, row.gstNo, row.contactPerson, row.contactNumber, row.salesPerson].some((value) => String(value || '').toLocaleLowerCase('en-IN').includes(needle)))
   }, [companies, query])
 
-  const totalTarget = companies.reduce((sum, row) => sum + Number(row.target || 0), 0)
-  const states = new Set(companies.map((row) => row.state).filter(Boolean)).size
+  useEffect(() => { setPage(1) }, [query, pageSize])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  useEffect(() => { setPage((current) => Math.min(current, totalPages)) }, [totalPages])
+  const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const showingStart = filtered.length ? (page - 1) * pageSize + 1 : 0
+  const showingEnd = Math.min(page * pageSize, filtered.length)
 
   return <section className="stack">
-    <div className="panel split-panel"><div><h2>Companies</h2><p>Company master synchronized from the Companies tab in Google Sheets.</p></div><button className="primary-button" onClick={load} type="button"><RefreshCw size={17} /> Refresh</button></div>
+    <div className="master-title"><h2>COMPANIES MASTER</h2><button className="secondary-button" onClick={load} type="button"><RefreshCw size={15} /> Refresh</button></div>
     {error && <div className="banner danger">{error}</div>}
-    <div className="metric-grid compact"><CompanyMetric label="Companies" value={companies.length} /><CompanyMetric label="States" value={states} /><CompanyMetric label="Combined Target" value={currency(totalTarget)} /><CompanyMetric label="Last Sync" value={companies[0]?.syncedAt || 'Not synced'} /></div>
-    <div className="panel company-search"><label>Search Companies<div className="search-input"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Company, ID, GST, location, contact or salesperson" /></div></label></div>
-    {loading ? <div className="state-panel"><Building2 size={28} /><h2>Loading companies</h2></div> : <div className="panel table-panel"><div className="table-heading"><h2>Company Master ({filtered.length})</h2></div><div className="table-wrap"><table className="companies-table"><thead><tr><th>Id</th><th>Company</th><th>District</th><th>State</th><th>GST No</th><th>Contact Person</th><th>Contact Number</th><th>Email</th><th>Sales Person</th><th>Target</th><th>Synced At</th></tr></thead><tbody>
-      {filtered.map((row) => <tr key={row.id}><td>{row.id}</td><td className="customer-name">{row.company}</td><td>{row.district}</td><td>{row.state}</td><td>{row.gstNo}</td><td>{row.contactPerson}</td><td>{row.contactNumber}</td><td>{row.email}</td><td>{row.salesPerson}</td><td className="num">{currency(row.target)}</td><td>{row.syncedAt}</td></tr>)}
+    <div className="panel company-search"><div className="search-input"><Search size={15} /><input aria-label="Search companies" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search companies..." /></div></div>
+    <div className="company-stats"><CompanyMetric label="Total Records" value={companies.length} /><CompanyMetric label="Filtered Records" value={filtered.length} /><CompanyMetric label="Showing" value={visible.length} /><CompanyMetric label="Page" value={`${page} / ${totalPages}`} /></div>
+    {loading ? <div className="state-panel"><Building2 size={28} /><h2>Loading companies</h2></div> : <div className="company-table-shell"><div className="table-wrap company-table-scroll"><table className="companies-table"><thead><tr><th>Sl No</th><th>Company</th><th>Contact Person</th><th>Contact Number</th><th>Email ID</th><th>Address</th><th>District</th><th>State</th><th>GST No</th><th>Sales Person</th><th>Target</th></tr></thead><tbody>
+      {visible.map((row, index) => <tr key={row.id}><td className="num">{showingStart + index}</td><td className="customer-name">{row.company}</td><td>{row.contactPerson}</td><td>{row.contactNumber}</td><td>{row.email}</td><td className="address-cell">{row.address}</td><td>{row.district}</td><td>{row.state}</td><td>{row.gstNo}</td><td>{row.salesPerson}</td><td className="num">{currency(row.target)}</td></tr>)}
       {!filtered.length && <tr><td colSpan="11">No companies found. Run the Companies sync from Google Sheets, then refresh this page.</td></tr>}
-    </tbody></table></div></div>}
+    </tbody></table></div><div className="company-pager"><span>Showing {showingStart}-{showingEnd} of {filtered.length}</span><div><label>Rows <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}><option>25</option><option>50</option><option>100</option></select></label><button disabled={page === 1} onClick={() => setPage((current) => current - 1)} type="button">Prev</button><strong>Page {page} / {totalPages}</strong><button disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} type="button">Next</button></div></div></div>}
   </section>
 }
 
-function CompanyMetric({ label, value }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div> }
+function CompanyMetric({ label, value }) { return <div className="company-stat"><span>{label}</span><strong>{value}</strong></div> }
 function currency(value) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0)) }
