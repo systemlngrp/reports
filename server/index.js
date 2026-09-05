@@ -18,6 +18,7 @@ import {
   getExclusions,
   getFirms,
   getReceiptHistory,
+  getOutstandingSnapshot,
   getSalesHistory,
   getSalesPersonTargets,
   getTargets,
@@ -27,11 +28,13 @@ import {
   upsertTargets,
   upsertSalesPersonTargets,
   upsertWeeklySalesTargets,
+  replaceOutstandingSnapshot,
   updateFirm,
 } from './store.js'
-import { fetchVoucherData, testTallyConnection } from './tally.js'
+import { fetchOutstandingData, fetchVoucherData, testTallyConnection } from './tally.js'
 import { buildSalesReport, financialYearForDate, normalizeParty } from './sales-report.js'
 import { buildTargetPerformance, monthRange, weeksForMonth } from './target-performance.js'
+import { buildFirmWiseReport } from './firm-wise-report.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -299,6 +302,32 @@ app.get('/api/reporting/sales-tracker', async (req, res) => {
   }
 })
 
+app.get('/api/reporting/firm-wise', async (req, res) => {
+  try {
+    const firm = requiredText(req.query.firm, 'Firm')
+    const asOfDate = validDate(req.query.asOfDate, 'As-of date')
+    const financialYear = financialYearForDate(asOfDate)
+    const [sales, creditNotes, receipts, targets, companies, outstanding] = await Promise.all([
+      getSalesHistory(), getCreditNoteHistory(), getReceiptHistory(), getTargets(financialYear), getCompanies(), getOutstandingSnapshot(firm, asOfDate),
+    ])
+    res.json(buildFirmWiseReport({ firm, asOfDate, sales, creditNotes, receipts, targets, companies, outstanding,
+      dealingPerson: String(req.query.dealingPerson || ''), refPerson: String(req.query.refPerson || ''), snapshotAt: outstanding[0]?.fetchedAt || null }))
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
+app.post('/api/tally/outstanding/fetch', async (req, res) => {
+  try {
+    const asOfDate = validDate(req.body.asOfDate, 'As-of date')
+    const firms = await getFirms()
+    const firm = firms.find((row) => row.id === String(req.body.firmId || ''))
+    if (!firm) return res.status(404).json({ message: 'Firm not found.' })
+    validatePort(firm.port)
+    const result = await fetchOutstandingData({ firm, asOfDate })
+    const saved = await replaceOutstandingSnapshot(firm.name, asOfDate, result.records)
+    res.json({ firmId: firm.id, firm: firm.name, asOfDate, ...result, ...saved })
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
 app.post('/api/tally/:type/fetch', async (req, res) => {
   try {
     const { type } = req.params
@@ -375,6 +404,12 @@ function requiredText(value, label) {
   return text
 }
 
+function validDate(value, label) {
+  const date = String(value || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw new Error(`${label} must use a valid YYYY-MM-DD date.`)
+  return date
+}
+
 function validFinancialYear(value) {
   const financialYear = String(value || '').trim()
   if (!/^\d{4}-\d{2}$/.test(financialYear)) throw new Error('Financial year must use YYYY-YY format.')
@@ -424,7 +459,10 @@ function normalizeCompanyRow(row, index) {
     state: String(row.State || '').trim(), gstNo: String(row['GST NO'] || '').trim(),
     email: String(row.Email || '').trim(), contactPerson: String(row['Contact Person'] || '').trim(),
     contactNumber: String(row['Contact Number'] || '').trim(), pin: String(row.PIN || '').trim(),
-    salesPerson: String(row['Sales Person'] || '').trim(), target, sourceData: row,
+    salesPerson: String(row['Sales Person'] || row['Dealing Person'] || '').trim(),
+    dealingPerson: String(row['Dealing Person'] || row['Sales Person'] || '').trim(),
+    refPerson: String(row['Ref. Person'] || row['Ref Person'] || row['Reference Person'] || '').trim(),
+    target, sourceData: row,
   }
 }
 

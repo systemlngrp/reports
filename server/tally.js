@@ -39,6 +39,18 @@ export async function fetchVoucherData({ firm, type, fromDate, toDate }) {
   }
 }
 
+export async function fetchOutstandingData({ firm, asOfDate }) {
+  const xml = await postToTally(firm.port, buildOutstandingRequest(asOfDate))
+  const records = parseOutstandingXml(xml)
+  return { records, rawCount: records.length, message: records.length ? `Fetched ${records.length} outstanding bill(s) from ${firm.name}.` : `No outstanding bills were returned by ${firm.name}.` }
+}
+
+export function parseOutstandingXml(xml) {
+  const parsed = parser.parse(xml)
+  const bills = collectByKey(parsed, 'BILL')
+  return bills.map((bill, index) => normalizeOutstandingBill(bill, index)).filter((row) => row.partyName && row.billReference && Number.isFinite(row.outstandingAmount))
+}
+
 async function postToTally(port, body) {
   const url = `http://localhost:${port}`
   const controller = new AbortController()
@@ -123,6 +135,10 @@ function buildVoucherRequest(voucherType, fromDate, toDate) {
 </ENVELOPE>`.trim()
 }
 
+function buildOutstandingRequest(asOfDate) {
+  return `<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>OutstandingBills</ID></HEADER><BODY><DESC><STATICVARIABLES><SVTODATE>${formatTallyDate(asOfDate)}</SVTODATE><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT></STATICVARIABLES><TDL><TDLMESSAGE><COLLECTION NAME="OutstandingBills" ISMODIFY="No"><TYPE>Bill</TYPE><FETCH>Name,Parent,OpeningBalance,ClosingBalance,BillDate,DueDate</FETCH><COMPUTE>PartyName:$Parent</COMPUTE><COMPUTE>BillReference:$Name</COMPUTE><COMPUTE>OriginalAmount:$OpeningBalance</COMPUTE><COMPUTE>OutstandingAmount:$ClosingBalance</COMPUTE></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>`
+}
+
 function formatTallyDate(value) {
   if (!value) return new Date().toISOString().slice(0, 10).replaceAll('-', '')
   return String(value).replaceAll('-', '')
@@ -198,6 +214,11 @@ function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
   const party = stringValue(voucher.PARTYLEDGERNAME || voucher.LEDGERNAME || '')
   const amount = Math.abs(numberValue(voucher.AMOUNT || collectAmount(voucher)))
 
+  const allocations = collectByKey(voucher, 'BILLALLOCATIONS.LIST').map((row, index) => ({
+    billReference: stringValue(row.NAME || `allocation-${index + 1}`),
+    allocationType: stringValue(row.BILLTYPE || row.TYPE || ''),
+    amount: Math.abs(numberValue(row.AMOUNT)),
+  }))
   return {
     id: `${firmName}-${voucherType}-${voucherNo}-${voucherIndex}`,
     firm: firmName,
@@ -208,6 +229,19 @@ function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
     amount,
     narration: stringValue(voucher.NARRATION || ''),
     source: 'tally',
+    allocations,
+  }
+}
+
+function normalizeOutstandingBill(bill, index) {
+  const partyName = stringValue(bill.PARTYNAME || bill.PARENT || bill.LEDGERNAME)
+  const billReference = stringValue(bill.BILLREFERENCE || bill.NAME || bill.REFERENCE || `bill-${index + 1}`)
+  const outstandingAmount = Math.abs(numberValue(bill.OUTSTANDINGAMOUNT || bill.CLOSINGBALANCE || bill.AMOUNT))
+  return {
+    partyKey: partyName.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-IN'), partyName, billReference,
+    billDate: normalizeDate(bill.BILLDATE || bill.DATE), dueDate: normalizeDate(bill.DUEDATE),
+    originalAmount: Math.abs(numberValue(bill.ORIGINALAMOUNT || bill.OPENINGBALANCE || bill.AMOUNT)),
+    outstandingAmount, billStatus: stringValue(bill.BILLSTATUS || (outstandingAmount ? 'Outstanding' : 'Closed')),
   }
 }
 

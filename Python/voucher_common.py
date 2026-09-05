@@ -65,6 +65,17 @@ def ensure_voucher_table(config: dict[str, object], table_name: str) -> None:
             )
             """
         )
+        if table_name == "receipts_history":
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS receipt_allocations (
+                  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  receipt_id VARCHAR(128) NOT NULL,
+                  bill_reference VARCHAR(255) NOT NULL,
+                  allocation_type VARCHAR(50) DEFAULT '',
+                  amount DECIMAL(16,2) DEFAULT 0,
+                  UNIQUE KEY uq_receipt_allocation (receipt_id, bill_reference, allocation_type)
+                )"""
+            )
         connection.commit()
     finally:
         cursor.close()
@@ -159,6 +170,14 @@ def normalize_voucher(voucher: ET.Element, firm_name: str, voucher_type: str, vo
     date = normalize_date(text_of(voucher, "DATE"))
     voucher_no = text_of(voucher, "VOUCHERNUMBER") or text_of(voucher, "REFERENCE") or f"TALLY-{voucher_index + 1}"
 
+    allocations = []
+    for element in voucher.iter():
+        if strip_ns(element.tag).upper() == "BILLALLOCATIONS.LIST":
+            allocations.append({
+                "bill_reference": text_of(element, "NAME") or f"allocation-{len(allocations) + 1}",
+                "allocation_type": text_of(element, "BILLTYPE") or text_of(element, "TYPE"),
+                "amount": abs(number_value(text_of(element, "AMOUNT"))),
+            })
     return {
         "id": f"{firm_name}-{voucher_type}-{voucher_no}-{voucher_index}",
         "firm": firm_name,
@@ -169,6 +188,7 @@ def normalize_voucher(voucher: ET.Element, firm_name: str, voucher_type: str, vo
         "amount": abs(number_value(text_of(voucher, "AMOUNT")) or collect_amount(voucher)),
         "narration": text_of(voucher, "NARRATION"),
         "source": "tally",
+        "allocations": allocations,
     }
 
 
@@ -228,8 +248,16 @@ def save_voucher_records(config: dict[str, object], table_name: str, records: li
               narration = VALUES(narration),
               source = VALUES(source)
             """,
-            records,
+            [{key: value for key, value in record.items() if key != "allocations"} for record in records],
         )
+        if table_name == "receipts_history":
+            for record in records:
+                cursor.execute("DELETE FROM receipt_allocations WHERE receipt_id = %s", (record["id"],))
+                for allocation in record.get("allocations", []):
+                    cursor.execute(
+                        "INSERT INTO receipt_allocations (receipt_id, bill_reference, allocation_type, amount) VALUES (%s, %s, %s, %s)",
+                        (record["id"], allocation["bill_reference"], allocation["allocation_type"], allocation["amount"]),
+                    )
         connection.commit()
     finally:
         cursor.close()

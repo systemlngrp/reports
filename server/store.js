@@ -101,6 +101,19 @@ export async function ensureSchema() {
     )
   `)
 
+  await db.query(`CREATE TABLE IF NOT EXISTS outstanding_snapshots (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, firm VARCHAR(255) NOT NULL, snapshot_date DATE NOT NULL,
+    party_key VARCHAR(255) NOT NULL, party_name VARCHAR(255) NOT NULL, bill_reference VARCHAR(255) NOT NULL,
+    bill_date DATE NULL, due_date DATE NULL, original_amount DECIMAL(16,2) DEFAULT 0,
+    outstanding_amount DECIMAL(16,2) DEFAULT 0, bill_status VARCHAR(50) DEFAULT '', fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_outstanding_snapshot (firm, snapshot_date, party_key, bill_reference)
+  )`)
+  await db.query(`CREATE TABLE IF NOT EXISTS receipt_allocations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, receipt_id VARCHAR(128) NOT NULL, bill_reference VARCHAR(255) NOT NULL,
+    allocation_type VARCHAR(50) DEFAULT '', amount DECIMAL(16,2) DEFAULT 0,
+    UNIQUE KEY uq_receipt_allocation (receipt_id, bill_reference, allocation_type)
+  )`)
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS intercompany_exclusions (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -130,6 +143,8 @@ export async function ensureSchema() {
       synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `)
+  await addColumnIfMissing(db, 'companies', 'dealing_person', "VARCHAR(255) DEFAULT ''")
+  await addColumnIfMissing(db, 'companies', 'ref_person', "VARCHAR(255) DEFAULT ''")
 
   await removePresetData(db)
 
@@ -151,6 +166,11 @@ async function createVoucherTable(db, tableName) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `)
+}
+
+async function addColumnIfMissing(db, table, column, definition) {
+  const [rows] = await db.query(`SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`, [table, column])
+  if (!rows.length) await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }
 
 async function removePresetData(db) {
@@ -242,7 +262,11 @@ export async function getSalesHistory() {
 }
 
 export async function getReceiptHistory() {
-  return getVoucherHistory('receipts_history')
+  const rows = await getVoucherHistory('receipts_history')
+  const db = getPool()
+  const [allocations] = await db.query(`SELECT receipt_id AS receiptId, SUM(CASE WHEN LOWER(allocation_type) IN ('on account','onaccount','new ref') THEN ABS(amount) ELSE 0 END) AS onAccountAmount FROM receipt_allocations GROUP BY receipt_id`)
+  const amounts = new Map(allocations.map((row) => [row.receiptId, Number(row.onAccountAmount || 0)]))
+  return rows.map((row) => ({ ...row, onAccountAmount: amounts.get(row.id) || 0 }))
 }
 
 export async function getCreditNoteHistory() {
@@ -309,7 +333,9 @@ export async function appendSalesHistory(records) {
 }
 
 export async function appendReceiptHistory(records) {
-  return appendVoucherHistory('receipts_history', records)
+  const saved = await appendVoucherHistory('receipts_history', records)
+  for (const row of records) await replaceReceiptAllocations(row.id, row.allocations || [])
+  return saved
 }
 
 export async function appendCreditNoteHistory(records) {
@@ -407,6 +433,38 @@ export async function upsertWeeklySalesTargets({ firm, salesPerson, weeks }) {
   return { saved: weeks.length }
 }
 
+export async function replaceOutstandingSnapshot(firm, snapshotDate, rows) {
+  const db = getPool()
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    await connection.query('DELETE FROM outstanding_snapshots WHERE firm = ? AND snapshot_date = ?', [firm, snapshotDate])
+    for (const row of rows) await connection.query(`INSERT INTO outstanding_snapshots
+      (firm, snapshot_date, party_key, party_name, bill_reference, bill_date, due_date, original_amount, outstanding_amount, bill_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [firm, snapshotDate, row.partyKey, row.partyName, row.billReference, row.billDate || null, row.dueDate || null, row.originalAmount, row.outstandingAmount, row.billStatus])
+    await connection.commit()
+    return { saved: rows.length }
+  } catch (error) { await connection.rollback(); throw error } finally { connection.release() }
+}
+
+export async function getOutstandingSnapshot(firm, snapshotDate) {
+  const db = getPool()
+  const [rows] = await db.query(`SELECT firm, DATE_FORMAT(snapshot_date, '%Y-%m-%d') AS snapshotDate,
+    party_key AS partyKey, party_name AS partyName, bill_reference AS billReference,
+    DATE_FORMAT(bill_date, '%Y-%m-%d') AS billDate, DATE_FORMAT(due_date, '%Y-%m-%d') AS dueDate,
+    original_amount AS originalAmount, outstanding_amount AS outstandingAmount, bill_status AS billStatus,
+    DATE_FORMAT(fetched_at, '%Y-%m-%d %H:%i:%s') AS fetchedAt
+    FROM outstanding_snapshots WHERE firm = ? AND snapshot_date = ? ORDER BY party_name, due_date`, [firm, snapshotDate])
+  return rows
+}
+
+export async function replaceReceiptAllocations(receiptId, allocations) {
+  const db = getPool()
+  await db.query('DELETE FROM receipt_allocations WHERE receipt_id = ?', [receiptId])
+  for (const row of allocations) await db.query(`INSERT INTO receipt_allocations (receipt_id, bill_reference, allocation_type, amount)
+    VALUES (?, ?, ?, ?)`, [receiptId, row.billReference, row.allocationType, row.amount])
+}
+
 export async function getExclusions() {
   const db = getPool()
   const [rows] = await db.query(`
@@ -442,7 +500,7 @@ export async function getCompanies() {
   const [rows] = await db.query(`
     SELECT external_id AS id, company, address, district, state, gst_no AS gstNo,
       email, contact_person AS contactPerson, contact_number AS contactNumber,
-      pin, sales_person AS salesPerson, target,
+      pin, sales_person AS salesPerson, dealing_person AS dealingPerson, ref_person AS refPerson, target,
       DATE_FORMAT(synced_at, '%Y-%m-%d %H:%i:%s') AS syncedAt
     FROM companies ORDER BY company
   `)
@@ -459,16 +517,18 @@ export async function upsertCompanies(companies) {
       await connection.query(`
         INSERT INTO companies
           (external_id, company, address, district, state, gst_no, email, contact_person,
-           contact_number, pin, sales_person, target, source_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           contact_number, pin, sales_person, dealing_person, ref_person, target, source_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           company = VALUES(company), address = VALUES(address), district = VALUES(district),
           state = VALUES(state), gst_no = VALUES(gst_no), email = VALUES(email),
           contact_person = VALUES(contact_person), contact_number = VALUES(contact_number),
-          pin = VALUES(pin), sales_person = VALUES(sales_person), target = VALUES(target),
+          pin = VALUES(pin), sales_person = VALUES(sales_person), dealing_person = VALUES(dealing_person),
+          ref_person = VALUES(ref_person), target = VALUES(target),
           source_data = VALUES(source_data)
       `, [row.id, row.company, row.address, row.district, row.state, row.gstNo, row.email,
-        row.contactPerson, row.contactNumber, row.pin, row.salesPerson, row.target, JSON.stringify(row.sourceData)])
+        row.contactPerson, row.contactNumber, row.pin, row.salesPerson, row.dealingPerson, row.refPerson,
+        row.target, JSON.stringify(row.sourceData)])
     }
     await connection.commit()
     return { synced: companies.length }
