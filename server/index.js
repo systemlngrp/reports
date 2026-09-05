@@ -10,6 +10,7 @@ import {
   createFirm,
   deleteExclusion,
   deleteFirm,
+  deleteSalesPersonTargets,
   deleteTargets,
   ensureSchema,
   getCreditNoteHistory,
@@ -18,14 +19,19 @@ import {
   getFirms,
   getReceiptHistory,
   getSalesHistory,
+  getSalesPersonTargets,
   getTargets,
+  getWeeklySalesTargets,
   upsertExclusion,
   upsertCompanies,
   upsertTargets,
+  upsertSalesPersonTargets,
+  upsertWeeklySalesTargets,
   updateFirm,
 } from './store.js'
 import { fetchVoucherData, testTallyConnection } from './tally.js'
 import { buildSalesReport, financialYearForDate, normalizeParty } from './sales-report.js'
+import { buildTargetPerformance, monthRange, weeksForMonth } from './target-performance.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -193,6 +199,65 @@ app.delete('/api/reporting/targets/:customerKey/:financialYear', async (req, res
   }
 })
 
+app.get('/api/reporting/sales-person-targets', async (req, res) => {
+  try {
+    res.json(await getSalesPersonTargets({ firm: String(req.query.firm || ''), financialYear: String(req.query.financialYear || '') }))
+  } catch (error) { res.status(500).json({ message: error.message }) }
+})
+
+app.put('/api/reporting/sales-person-targets', async (req, res) => {
+  try {
+    res.json(await upsertSalesPersonTargets(validateSalesPersonTarget(req.body)))
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
+app.delete('/api/reporting/sales-person-targets', async (req, res) => {
+  try {
+    const firm = requiredText(req.query.firm, 'Firm')
+    const salesPerson = requiredText(req.query.salesPerson, 'Sales person')
+    const financialYear = validFinancialYear(req.query.financialYear)
+    res.json(await deleteSalesPersonTargets(firm, salesPerson, financialYear))
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
+app.get('/api/reporting/target-performance', async (req, res) => {
+  try {
+    const firm = requiredText(req.query.firm, 'Firm')
+    const financialYear = validFinancialYear(req.query.financialYear)
+    const salesPerson = String(req.query.salesPerson || '').trim()
+    const fiscalMonth = req.query.fiscalMonth ? validFiscalMonth(req.query.fiscalMonth) : 0
+    const asOfDate = String(req.query.asOfDate || new Date().toISOString().slice(0, 10))
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) throw new Error('As-of date must use YYYY-MM-DD.')
+    const [sales, creditNotes, companies, monthlyTargets] = await Promise.all([
+      getSalesHistory(), getCreditNoteHistory(), getCompanies(), getSalesPersonTargets({ firm, financialYear }),
+    ])
+    let weeklyTargets = []
+    if (salesPerson && fiscalMonth) {
+      const range = monthRange(financialYear, fiscalMonth)
+      weeklyTargets = await getWeeklySalesTargets({ firm, salesPerson, startDate: range.startDate, endDate: range.endDate })
+    }
+    res.json(buildTargetPerformance({ sales, creditNotes, companies, monthlyTargets, weeklyTargets, firm, financialYear, salesPerson, fiscalMonth, asOfDate }))
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
+app.put('/api/reporting/weekly-sales-targets', async (req, res) => {
+  try {
+    const firm = requiredText(req.body.firm, 'Firm')
+    const salesPerson = requiredText(req.body.salesPerson, 'Sales person')
+    const financialYear = validFinancialYear(req.body.financialYear)
+    const fiscalMonth = validFiscalMonth(req.body.fiscalMonth)
+    const expected = weeksForMonth(financialYear, fiscalMonth)
+    if (!Array.isArray(req.body.weeks) || req.body.weeks.length !== expected.length) throw new Error('All generated weeks are required.')
+    const weeks = req.body.weeks.map((week, index) => {
+      const amount = Number(week.amount)
+      if (week.startDate !== expected[index].startDate || week.endDate !== expected[index].endDate) throw new Error('Week boundaries do not match the selected month.')
+      if (!Number.isFinite(amount) || amount < 0) throw new Error('Weekly targets must be non-negative numbers.')
+      return { startDate: week.startDate, endDate: week.endDate, amount }
+    })
+    res.json(await upsertWeeklySalesTargets({ firm, salesPerson, weeks }))
+  } catch (error) { res.status(400).json({ message: error.message }) }
+})
+
 app.get('/api/reporting/exclusions', async (_req, res) => {
   try {
     res.json(await getExclusions())
@@ -302,6 +367,36 @@ function validateTarget(value) {
   const months = value.months.map(Number)
   if (months.some((amount) => !Number.isFinite(amount) || amount < 0)) throw new Error('Targets must be valid non-negative amounts.')
   return { customerName, customerKey: normalizeParty(customerName), financialYear, months }
+}
+
+function requiredText(value, label) {
+  const text = String(value || '').trim()
+  if (!text) throw new Error(`${label} is required.`)
+  return text
+}
+
+function validFinancialYear(value) {
+  const financialYear = String(value || '').trim()
+  if (!/^\d{4}-\d{2}$/.test(financialYear)) throw new Error('Financial year must use YYYY-YY format.')
+  const start = Number(financialYear.slice(0, 4))
+  if (Number(financialYear.slice(5)) !== (start + 1) % 100) throw new Error('Financial year must contain consecutive years.')
+  return financialYear
+}
+
+function validFiscalMonth(value) {
+  const fiscalMonth = Number(value)
+  if (!Number.isInteger(fiscalMonth) || fiscalMonth < 1 || fiscalMonth > 12) throw new Error('Fiscal month must be between 1 and 12.')
+  return fiscalMonth
+}
+
+function validateSalesPersonTarget(value) {
+  const firm = requiredText(value?.firm, 'Firm')
+  const salesPerson = requiredText(value?.salesPerson, 'Sales person')
+  const financialYear = validFinancialYear(value?.financialYear)
+  if (!Array.isArray(value?.months) || value.months.length !== 12) throw new Error('All 12 monthly targets are required.')
+  const months = value.months.map(Number)
+  if (months.some((amount) => !Number.isFinite(amount) || amount < 0)) throw new Error('Targets must be valid non-negative amounts.')
+  return { firm, salesPerson, financialYear, months }
 }
 
 function validateSyncRequest(req) {

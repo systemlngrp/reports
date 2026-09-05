@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Building2,
+  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   RefreshCw,
   Save,
   Search,
+  SlidersHorizontal,
   ShoppingCart,
   Target,
   Trash2,
@@ -25,10 +27,11 @@ import {
   XCircle,
 } from 'lucide-react'
 import './App.css'
-import { IntercompanySettings, SalesTracker, TargetManagement } from './SalesTracker.jsx'
+import { IntercompanySettings, SalesTracker } from './SalesTracker.jsx'
 import Companies from './Companies.jsx'
 import SalesPersonReport from './SalesPersonReport.jsx'
 import PerformanceReport from './PerformanceReport.jsx'
+import { CustomTarget, SalesManTargets, WeeklyMonthlyTargets } from './TargetReports.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
@@ -40,7 +43,11 @@ const navItems = [
   { id: 'master', label: 'Master', icon: FileText, children: [
     { id: 'companies', label: 'Companies', icon: Building2 },
   ] },
-  { id: 'targets', label: 'Customer Targets', icon: Target },
+  { id: 'target-menu', label: 'Target', icon: Target, children: [
+    { id: 'custom-target', label: 'Custom Target', icon: Target },
+    { id: 'sales-man-target', label: 'Target by Sales Man', icon: UsersRound },
+    { id: 'weekly-monthly-target', label: 'Sales Weekly Monthly Target', icon: CalendarDays },
+  ] },
   { id: 'intercompany', label: 'Intercompany', icon: UsersRound },
   { id: 'sales', label: 'Sales', icon: ShoppingCart },
   { id: 'receipts', label: 'Receipts', icon: Receipt },
@@ -55,7 +62,9 @@ const pageThemes = {
   'sales-person': 'theme-blue-cyan',
   performance: 'theme-blue-cyan',
   companies: 'theme-blue',
-  targets: 'theme-cyan',
+  'custom-target': 'theme-cyan',
+  'sales-man-target': 'theme-cyan',
+  'weekly-monthly-target': 'theme-cyan',
   intercompany: 'theme-red',
   sales: 'theme-red',
   receipts: 'theme-cyan',
@@ -70,7 +79,9 @@ const pagePaths = {
   'sales-person': '/sales-person',
   performance: '/performance',
   companies: '/companies',
-  targets: '/targets',
+  'custom-target': '/targets/custom',
+  'sales-man-target': '/targets/sales-man',
+  'weekly-monthly-target': '/targets/weekly-monthly',
   intercompany: '/intercompany',
   sales: '/Sales',
   receipts: '/receipt',
@@ -89,7 +100,10 @@ const routeAliases = {
   '/sales-person': 'sales-person',
   '/performance': 'performance',
   '/companies': 'companies',
-  '/targets': 'targets',
+  '/targets': 'custom-target',
+  '/targets/custom': 'custom-target',
+  '/targets/sales-man': 'sales-man-target',
+  '/targets/weekly-monthly': 'weekly-monthly-target',
   '/intercompany': 'intercompany',
   '/sales': 'sales',
   '/Sales': 'sales',
@@ -124,7 +138,7 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(true)
-  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance'].includes(active), master: active === 'companies' })
+  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance'].includes(active), master: active === 'companies', 'target-menu': ['custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
 
   useEffect(() => {
     loadInitialData()
@@ -280,7 +294,9 @@ function App() {
             {active === 'sales-person' && <SalesPersonReport firms={firms} />}
             {active === 'performance' && <PerformanceReport firms={firms} />}
             {active === 'companies' && <Companies />}
-            {active === 'targets' && <TargetManagement />}
+            {active === 'custom-target' && <CustomTarget />}
+            {active === 'sales-man-target' && <SalesManTargets firms={firms} />}
+            {active === 'weekly-monthly-target' && <WeeklyMonthlyTargets firms={firms} />}
             {active === 'intercompany' && <IntercompanySettings firms={firms} />}
             {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}
             {active === 'receipts' && <VoucherHistory firms={firms} title="Receipts Report" rows={receiptHistory} />}
@@ -548,6 +564,7 @@ function SalesData({ firms, rows }) {
 
   const showingStart = filteredRows.length ? (page - 1) * salesPageSize + 1 : 0
   const showingEnd = Math.min(page * salesPageSize, filteredRows.length)
+  const activeFilterCount = Number(firm !== 'all') + Number(Boolean(fromDate)) + Number(Boolean(toDate))
 
   return (
     <section className="stack">
@@ -557,8 +574,20 @@ function SalesData({ firms, rows }) {
         </div>
       </div>
 
-      <div className="panel">
-        <div className="form-grid">
+      <div className="panel data-filter-panel">
+        <div className="filter-panel-heading">
+          <div className="filter-panel-title">
+            <span className="filter-icon" aria-hidden="true">
+              <SlidersHorizontal size={15} />
+            </span>
+            <div>
+              <h3>Filters</h3>
+              <p>Narrow the report by firm or invoice date</p>
+            </div>
+          </div>
+          {activeFilterCount > 0 && <span className="active-filter-count">{activeFilterCount} active</span>}
+        </div>
+        <div className="data-filter-grid">
           <label>
             Firm
             <select value={firm} onChange={(event) => setFirm(event.target.value)}>
@@ -579,8 +608,14 @@ function SalesData({ firms, rows }) {
             <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
           </label>
           <div className="filter-actions">
-            <button className="secondary-button" onClick={clearFilters} type="button">
-              Clear
+            <button
+              className="secondary-button clear-filter-button"
+              disabled={activeFilterCount === 0}
+              onClick={clearFilters}
+              type="button"
+            >
+              <XCircle size={14} />
+              Clear filters
             </button>
           </div>
         </div>
@@ -651,6 +686,8 @@ function VoucherHistory({ firms, title, rows }) {
     return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
   }, [filteredRows])
 
+  const activeFilterCount = Number(firm !== 'all') + Number(Boolean(fromDate)) + Number(Boolean(toDate))
+
   return (
     <section className="stack">
       <div className="panel split-panel">
@@ -659,8 +696,20 @@ function VoucherHistory({ firms, title, rows }) {
         </div>
       </div>
 
-      <div className="panel">
-        <div className="form-grid">
+      <div className="panel data-filter-panel">
+        <div className="filter-panel-heading">
+          <div className="filter-panel-title">
+            <span className="filter-icon" aria-hidden="true">
+              <SlidersHorizontal size={15} />
+            </span>
+            <div>
+              <h3>Filters</h3>
+              <p>Narrow the report by firm or voucher date</p>
+            </div>
+          </div>
+          {activeFilterCount > 0 && <span className="active-filter-count">{activeFilterCount} active</span>}
+        </div>
+        <div className="data-filter-grid">
           <label>
             Firm
             <select value={firm} onChange={(event) => setFirm(event.target.value)}>
@@ -681,8 +730,14 @@ function VoucherHistory({ firms, title, rows }) {
             <input value={toDate} onChange={(event) => setToDate(event.target.value)} type="date" />
           </label>
           <div className="filter-actions">
-            <button className="secondary-button" onClick={clearFilters} type="button">
-              Clear
+            <button
+              className="secondary-button clear-filter-button"
+              disabled={activeFilterCount === 0}
+              onClick={clearFilters}
+              type="button"
+            >
+              <XCircle size={14} />
+              Clear filters
             </button>
           </div>
         </div>

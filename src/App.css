@@ -815,10 +815,155 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
 .performance-kpis .negative { background: #fee2e2; }
 .performance-table { min-width: 1250px; }
 
+/* Target management */
+.target-page-title { display: flex; align-items: center; gap: 10px; }
+.target-page-title > span { width: 34px; height: 34px; border-radius: 6px; display: grid; place-items: center; color: #fff; background: var(--accent); }
+.target-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 260px)); gap: 12px; align-items: end; }
+.target-filter-grid.four-columns { grid-template-columns: repeat(4, minmax(160px, 1fr)); }
+.target-entry-panel { display: grid; gap: 14px; }
+.target-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.target-entry-heading h2, .target-entry-heading p { margin: 0; }
+.target-entry-heading p { margin-top: 4px; color: #667085; }
+.target-entry-heading strong { color: var(--accent-strong); font-size: 14px; }
+.target-save-row { justify-content: flex-end; }
+.target-kpis { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 8px; }
+.target-summary-table { min-width: 800px; }
+.weekly-target-table { min-width: 940px; }
+.weekly-target-table input { min-width: 130px; }
+.period-status { display: inline-flex; border-radius: 999px; padding: 4px 8px; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.period-status.completed { color: #067647; background: #dcfae6; }
+.period-status.in-progress { color: #b54708; background: #fef0c7; }
+.period-status.upcoming { color: #475467; background: #f2f4f7; }
+
+/* Report filter bar */
+.data-filter-panel {
+  padding: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.filter-panel-heading {
+  min-height: 45px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #d6dce5;
+  background: linear-gradient(90deg, var(--accent-soft), #ffffff 55%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.filter-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.filter-panel-title h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 12px;
+}
+
+.filter-panel-title p {
+  margin: 2px 0 0;
+  color: #667085;
+  font-size: 9px;
+}
+
+.filter-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  color: #ffffff;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.active-filter-count {
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.data-filter-grid {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(250px, 1.7fr) minmax(170px, 1fr) minmax(170px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.data-filter-grid label {
+  gap: 5px;
+  color: #344054;
+  font-size: 10px;
+  letter-spacing: .01em;
+}
+
+.data-filter-grid input,
+.data-filter-grid select {
+  min-height: 36px;
+  border-color: #98a2b3;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.data-filter-grid input:hover,
+.data-filter-grid select:hover {
+  border-color: var(--accent);
+}
+
+.clear-filter-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 45%, #111827);
+  background: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.clear-filter-button:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.clear-filter-button:disabled {
+  color: #98a2b3;
+  border-color: #d0d5dd;
+  background: #f9fafb;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 @media (max-width: 980px) {
   .company-stats { grid-template-columns: repeat(2, 1fr); }
   .company-pager { align-items: flex-start; flex-direction: column; padding: 8px 0; }
   .sales-person-filters, .sales-person-summary { grid-template-columns: 1fr; }
   .performance-filters, .performance-kpis { grid-template-columns: 1fr; }
+  .target-filter-grid, .target-filter-grid.four-columns, .target-kpis { grid-template-columns: 1fr; }
+  .target-entry-heading { align-items: flex-start; flex-direction: column; }
+  .data-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .data-filter-grid label:first-child { grid-column: 1 / -1; }
+  .data-filter-grid .filter-actions { grid-column: 1 / -1; }
+  .clear-filter-button { width: 100%; }
   .sales-person-summary > div { border-right: 0; border-bottom: 1px solid #111827; }
+}
+
+@media (max-width: 560px) {
+  .data-filter-grid { grid-template-columns: 1fr; }
+  .data-filter-grid label:first-child,
+  .data-filter-grid .filter-actions { grid-column: auto; }
+  .filter-panel-title p { display: none; }
 }

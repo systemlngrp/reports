@@ -76,6 +76,32 @@ export async function ensureSchema() {
   `)
 
   await db.query(`
+    CREATE TABLE IF NOT EXISTS sales_person_targets (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      firm VARCHAR(255) NOT NULL,
+      sales_person VARCHAR(255) NOT NULL,
+      financial_year VARCHAR(7) NOT NULL,
+      fiscal_month TINYINT UNSIGNED NOT NULL,
+      amount DECIMAL(16, 2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_sales_person_target (firm, sales_person, financial_year, fiscal_month)
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS weekly_sales_targets (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      firm VARCHAR(255) NOT NULL,
+      sales_person VARCHAR(255) NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      amount DECIMAL(16, 2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_weekly_sales_target (firm, sales_person, start_date, end_date)
+    )
+  `)
+
+  await db.query(`
     CREATE TABLE IF NOT EXISTS intercompany_exclusions (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       firm VARCHAR(255) NOT NULL,
@@ -326,6 +352,59 @@ export async function deleteTargets(customerKey, financialYear) {
     [customerKey, financialYear],
   )
   return { deleted: result.affectedRows }
+}
+
+export async function getSalesPersonTargets({ firm = '', financialYear = '' } = {}) {
+  const db = getPool()
+  const conditions = []
+  const params = []
+  if (firm) { conditions.push('firm = ?'); params.push(firm) }
+  if (financialYear) { conditions.push('financial_year = ?'); params.push(financialYear) }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const [rows] = await db.query(`SELECT id, firm, sales_person AS salesPerson, financial_year AS financialYear,
+    fiscal_month AS fiscalMonth, amount FROM sales_person_targets ${where} ORDER BY sales_person, fiscal_month`, params)
+  return rows
+}
+
+export async function upsertSalesPersonTargets({ firm, salesPerson, financialYear, months }) {
+  const db = getPool()
+  for (let index = 0; index < 12; index += 1) {
+    await db.query(`INSERT INTO sales_person_targets (firm, sales_person, financial_year, fiscal_month, amount)
+      VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE amount = VALUES(amount)`,
+    [firm, salesPerson, financialYear, index + 1, months[index]])
+  }
+  return getSalesPersonTargets({ firm, financialYear })
+}
+
+export async function deleteSalesPersonTargets(firm, salesPerson, financialYear) {
+  const db = getPool()
+  const [result] = await db.query('DELETE FROM sales_person_targets WHERE firm = ? AND sales_person = ? AND financial_year = ?', [firm, salesPerson, financialYear])
+  return { deleted: result.affectedRows }
+}
+
+export async function getWeeklySalesTargets({ firm = '', salesPerson = '', startDate = '', endDate = '' } = {}) {
+  const db = getPool()
+  const conditions = []
+  const params = []
+  if (firm) { conditions.push('firm = ?'); params.push(firm) }
+  if (salesPerson) { conditions.push('sales_person = ?'); params.push(salesPerson) }
+  if (startDate) { conditions.push('start_date >= ?'); params.push(startDate) }
+  if (endDate) { conditions.push('end_date <= ?'); params.push(endDate) }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+  const [rows] = await db.query(`SELECT id, firm, sales_person AS salesPerson,
+    DATE_FORMAT(start_date, '%Y-%m-%d') AS startDate, DATE_FORMAT(end_date, '%Y-%m-%d') AS endDate, amount
+    FROM weekly_sales_targets ${where} ORDER BY start_date`, params)
+  return rows
+}
+
+export async function upsertWeeklySalesTargets({ firm, salesPerson, weeks }) {
+  const db = getPool()
+  for (const week of weeks) {
+    await db.query(`INSERT INTO weekly_sales_targets (firm, sales_person, start_date, end_date, amount)
+      VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE amount = VALUES(amount)`,
+    [firm, salesPerson, week.startDate, week.endDate, week.amount])
+  }
+  return { saved: weeks.length }
 }
 
 export async function getExclusions() {
