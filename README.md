@@ -27,6 +27,10 @@ Use **Customer Targets** to enter April–March targets and **Intercompany** to 
 
 The tracker can be saved through the browser's **Print / PDF** action or exported as a multi-sheet Excel workbook.
 
+## Company Master Sync
+
+The **Master → Companies** page reads company records received at `POST /api/sync/companies`. Requests must send the configured `NPD_SYNC_SECRET` in the `X-Sync-Secret` header and identify the tab configured by `NPD_SYNC_ALLOWED_TAB` (normally `Companies`). Records are upserted by the sheet's `Id` column.
+
 ## Tally Setup
 
 In the app, open `Firms` and add each firm name with its Tally HTTP port number. Tally must be running on the same Windows PC, with HTTP/XML access available on those ports.

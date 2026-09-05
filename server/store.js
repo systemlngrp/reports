@@ -86,6 +86,25 @@ export async function ensureSchema() {
     )
   `)
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS companies (
+      external_id VARCHAR(255) PRIMARY KEY,
+      company VARCHAR(255) NOT NULL,
+      address TEXT NULL,
+      district VARCHAR(255) DEFAULT '',
+      state VARCHAR(255) DEFAULT '',
+      gst_no VARCHAR(100) DEFAULT '',
+      email VARCHAR(255) DEFAULT '',
+      contact_person VARCHAR(255) DEFAULT '',
+      contact_number VARCHAR(100) DEFAULT '',
+      pin VARCHAR(30) DEFAULT '',
+      sales_person VARCHAR(255) DEFAULT '',
+      target DECIMAL(16, 2) DEFAULT 0,
+      source_data LONGTEXT NULL,
+      synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `)
+
   await removePresetData(db)
 
   return { mode: 'mysql' }
@@ -337,6 +356,49 @@ export async function deleteExclusion(id) {
   const [result] = await db.query('DELETE FROM intercompany_exclusions WHERE id = ?', [id])
   if (!result.affectedRows) throw new Error('Intercompany exclusion not found.')
   return { id }
+}
+
+export async function getCompanies() {
+  const db = getPool()
+  const [rows] = await db.query(`
+    SELECT external_id AS id, company, address, district, state, gst_no AS gstNo,
+      email, contact_person AS contactPerson, contact_number AS contactNumber,
+      pin, sales_person AS salesPerson, target,
+      DATE_FORMAT(synced_at, '%Y-%m-%d %H:%i:%s') AS syncedAt
+    FROM companies ORDER BY company
+  `)
+  return rows
+}
+
+export async function upsertCompanies(companies) {
+  if (!companies.length) return { synced: 0 }
+  const db = getPool()
+  const connection = await db.getConnection()
+  try {
+    await connection.beginTransaction()
+    for (const row of companies) {
+      await connection.query(`
+        INSERT INTO companies
+          (external_id, company, address, district, state, gst_no, email, contact_person,
+           contact_number, pin, sales_person, target, source_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          company = VALUES(company), address = VALUES(address), district = VALUES(district),
+          state = VALUES(state), gst_no = VALUES(gst_no), email = VALUES(email),
+          contact_person = VALUES(contact_person), contact_number = VALUES(contact_number),
+          pin = VALUES(pin), sales_person = VALUES(sales_person), target = VALUES(target),
+          source_data = VALUES(source_data)
+      `, [row.id, row.company, row.address, row.district, row.state, row.gstNo, row.email,
+        row.contactPerson, row.contactNumber, row.pin, row.salesPerson, row.target, JSON.stringify(row.sourceData)])
+    }
+    await connection.commit()
+    return { synced: companies.length }
+  } catch (error) {
+    await connection.rollback()
+    throw error
+  } finally {
+    connection.release()
+  }
 }
 
 async function appendVoucherHistory(tableName, records) {

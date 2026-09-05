@@ -1,4 +1,5 @@
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
@@ -12,12 +13,14 @@ import {
   deleteTargets,
   ensureSchema,
   getCreditNoteHistory,
+  getCompanies,
   getExclusions,
   getFirms,
   getReceiptHistory,
   getSalesHistory,
   getTargets,
   upsertExclusion,
+  upsertCompanies,
   upsertTargets,
   updateFirm,
 } from './store.js'
@@ -106,6 +109,30 @@ app.get('/api/credit-notes-history', async (_req, res) => {
     res.json(await getCreditNoteHistory())
   } catch (error) {
     res.status(500).json({ message: error.message })
+  }
+})
+
+app.get('/api/companies', async (_req, res) => {
+  try {
+    res.json(await getCompanies())
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+})
+
+app.post('/api/sync/companies', async (req, res) => {
+  try {
+    validateSyncRequest(req)
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : null
+    if (!rows) throw new Error('A rows array is required.')
+    const maximum = Number(process.env.COMPANY_SYNC_MAX_BATCH_SIZE || 500)
+    if (rows.length > maximum) throw new Error(`A maximum of ${maximum} company rows can be synchronized at once.`)
+    const companies = rows.map(normalizeCompanyRow)
+    const result = await upsertCompanies(companies)
+    res.json({ success: true, mode: req.body.mode || 'partial', ...result })
+  } catch (error) {
+    const status = error.code === 'SYNC_AUTH' ? 401 : error.code === 'SYNC_CONFIG' ? 503 : 400
+    res.status(status).json({ success: false, message: error.message })
   }
 })
 
@@ -255,6 +282,43 @@ function validateTarget(value) {
   const months = value.months.map(Number)
   if (months.some((amount) => !Number.isFinite(amount) || amount < 0)) throw new Error('Targets must be valid non-negative amounts.')
   return { customerName, customerKey: normalizeParty(customerName), financialYear, months }
+}
+
+function validateSyncRequest(req) {
+  const expectedSecret = String(process.env.NPD_SYNC_SECRET || '')
+  if (!expectedSecret) throw syncError('NPD_SYNC_SECRET is not configured.', 'SYNC_CONFIG')
+  const allowedTab = String(process.env.NPD_SYNC_ALLOWED_TAB || 'Companies')
+  if (String(req.body?.tabName || '') !== allowedTab) throw new Error(`Only the ${allowedTab} tab may be synchronized.`)
+  const receivedSecret = String(req.get('X-Sync-Secret') || '')
+  const expected = Buffer.from(expectedSecret)
+  const received = Buffer.from(receivedSecret)
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    throw syncError('Invalid synchronization credentials.', 'SYNC_AUTH')
+  }
+}
+
+function normalizeCompanyRow(row, index) {
+  if (!row || typeof row !== 'object') throw new Error(`Company row ${index + 1} is invalid.`)
+  const company = String(row.Company || '').trim()
+  const id = String(row.Id || '').trim()
+  if (!id) throw new Error(`Company row ${index + 1} is missing Id.`)
+  if (!company) throw new Error(`Company row ${index + 1} is missing Company.`)
+  const targetText = String(row.TARGET || '').replace(/[,₹\s]/g, '')
+  const target = targetText ? Number(targetText) : 0
+  if (!Number.isFinite(target)) throw new Error(`Company row ${index + 1} has an invalid TARGET.`)
+  return {
+    id, company, address: String(row.Address || '').trim(), district: String(row.District || '').trim(),
+    state: String(row.State || '').trim(), gstNo: String(row['GST NO'] || '').trim(),
+    email: String(row.Email || '').trim(), contactPerson: String(row['Contact Person'] || '').trim(),
+    contactNumber: String(row['Contact Number'] || '').trim(), pin: String(row.PIN || '').trim(),
+    salesPerson: String(row['Sales Person'] || '').trim(), target, sourceData: row,
+  }
+}
+
+function syncError(message, code) {
+  const error = new Error(message)
+  error.code = code
+  return error
 }
 
 function addLedger(values, firm, name) {

@@ -26,11 +26,15 @@ import {
 } from 'lucide-react'
 import './App.css'
 import { IntercompanySettings, SalesTracker, TargetManagement } from './SalesTracker.jsx'
+import Companies from './Companies.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
   { id: 'reports', label: 'Reports', icon: ChartNoAxesCombined, children: [
     { id: 'sales-tracker', label: 'Sales Tracker', icon: ShoppingCart },
+  ] },
+  { id: 'master', label: 'Master', icon: FileText, children: [
+    { id: 'companies', label: 'Companies', icon: Building2 },
   ] },
   { id: 'targets', label: 'Customer Targets', icon: Target },
   { id: 'intercompany', label: 'Intercompany', icon: UsersRound },
@@ -44,6 +48,7 @@ const navItems = [
 const pageThemes = {
   dashboard: 'theme-blue',
   'sales-tracker': 'theme-blue-cyan',
+  companies: 'theme-blue',
   targets: 'theme-cyan',
   intercompany: 'theme-red',
   sales: 'theme-red',
@@ -56,6 +61,7 @@ const pageThemes = {
 const pagePaths = {
   dashboard: '/dashbaord',
   'sales-tracker': '/sales-tracker',
+  companies: '/companies',
   targets: '/targets',
   intercompany: '/intercompany',
   sales: '/Sales',
@@ -72,6 +78,7 @@ const routeAliases = {
   '/dashboard': 'dashboard',
   '/sales-tracker': 'sales-tracker',
   '/sales-by-month': 'sales-tracker',
+  '/companies': 'companies',
   '/targets': 'targets',
   '/intercompany': 'intercompany',
   '/sales': 'sales',
@@ -107,7 +114,7 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(true)
-  const [reportsOpen, setReportsOpen] = useState(active === 'sales-tracker')
+  const [openGroups, setOpenGroups] = useState({ reports: active === 'sales-tracker', master: active === 'companies' })
 
   useEffect(() => {
     loadInitialData()
@@ -189,10 +196,10 @@ function App() {
               const childActive = item.children.some((child) => child.id === active)
               return (
                 <div className="nav-group" key={item.id}>
-                  <button className={childActive ? 'nav-item active' : 'nav-item'} onClick={() => setReportsOpen((current) => !current)} type="button">
-                    <Icon size={18} /><span>{item.label}</span><ChevronRight className={reportsOpen ? 'nav-chevron open' : 'nav-chevron'} size={16} />
+                  <button className={childActive ? 'nav-item active' : 'nav-item'} onClick={() => setOpenGroups((current) => ({ ...current, [item.id]: !current[item.id] }))} type="button">
+                    <Icon size={18} /><span>{item.label}</span><ChevronRight className={openGroups[item.id] ? 'nav-chevron open' : 'nav-chevron'} size={16} />
                   </button>
-                  {reportsOpen && <div className="nav-children">{item.children.map((child) => {
+                  {openGroups[item.id] && <div className="nav-children">{item.children.map((child) => {
                     const ChildIcon = child.icon
                     return <button className={active === child.id ? 'nav-item active' : 'nav-item'} key={child.id} onClick={() => navigate(child.id)} type="button"><ChildIcon size={16} /><span>{child.label}</span></button>
                   })}</div>}
@@ -260,6 +267,7 @@ function App() {
               />
             )}
             {active === 'sales-tracker' && <SalesTracker firms={firms} />}
+            {active === 'companies' && <Companies />}
             {active === 'targets' && <TargetManagement />}
             {active === 'intercompany' && <IntercompanySettings firms={firms} />}
             {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}

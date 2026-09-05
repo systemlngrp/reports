@@ -707,6 +707,11 @@ td.num {
 .status-number.positive { color: #027a48; font-weight: 800; }
 .status-number.negative, td.negative { color: #b42318; font-weight: 800; }
 .total-row td { background: var(--accent-soft); color: var(--accent-strong); font-weight: 800; border-top: 2px solid var(--accent); }
+.company-search { max-width: 720px; }
+.search-input { position: relative; }
+.search-input svg { color: #64748b; left: 12px; position: absolute; top: 12px; }
+.search-input input { padding-left: 38px; }
+.companies-table { min-width: 1650px; }
 
 .target-editor { display: grid; grid-template-columns: 180px minmax(260px, 1fr) auto; gap: 16px; align-items: end; }
 .target-editor .month-inputs { grid-column: 1 / -1; }
