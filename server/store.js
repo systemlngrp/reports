@@ -113,6 +113,11 @@ export async function ensureSchema() {
     allocation_type VARCHAR(50) DEFAULT '', amount DECIMAL(16,2) DEFAULT 0,
     UNIQUE KEY uq_receipt_allocation (receipt_id, bill_reference, allocation_type)
   )`)
+  await db.query(`CREATE TABLE IF NOT EXISTS credit_note_allocations (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, credit_note_id VARCHAR(128) NOT NULL,
+    invoice_reference VARCHAR(255) NOT NULL, allocation_type VARCHAR(50) DEFAULT '', amount DECIMAL(16,2) DEFAULT 0,
+    UNIQUE KEY uq_credit_note_allocation (credit_note_id, invoice_reference, allocation_type)
+  )`)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS intercompany_exclusions (
@@ -339,7 +344,24 @@ export async function appendReceiptHistory(records) {
 }
 
 export async function appendCreditNoteHistory(records) {
-  return appendVoucherHistory('credit_notes_history', records)
+  const saved = await appendVoucherHistory('credit_notes_history', records)
+  for (const row of records) await replaceCreditNoteAllocations(row.id, row.allocations || [])
+  return saved
+}
+
+export async function getCreditNoteAllocations() {
+  const db = getPool()
+  const [rows] = await db.query(`SELECT credit_note_id AS creditNoteId, invoice_reference AS invoiceReference,
+    allocation_type AS allocationType, amount FROM credit_note_allocations ORDER BY credit_note_id, id`)
+  return rows
+}
+
+export async function replaceCreditNoteAllocations(creditNoteId, allocations) {
+  const db = getPool()
+  await db.query('DELETE FROM credit_note_allocations WHERE credit_note_id = ?', [creditNoteId])
+  for (const row of allocations) await db.query(`INSERT INTO credit_note_allocations
+    (credit_note_id, invoice_reference, allocation_type, amount) VALUES (?, ?, ?, ?)`,
+  [creditNoteId, row.billReference, row.allocationType, row.amount])
 }
 
 export async function getTargets(financialYear) {

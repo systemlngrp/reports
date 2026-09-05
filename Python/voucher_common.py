@@ -76,6 +76,17 @@ def ensure_voucher_table(config: dict[str, object], table_name: str) -> None:
                   UNIQUE KEY uq_receipt_allocation (receipt_id, bill_reference, allocation_type)
                 )"""
             )
+        if table_name == "credit_notes_history":
+            cursor.execute(
+                """CREATE TABLE IF NOT EXISTS credit_note_allocations (
+                  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                  credit_note_id VARCHAR(128) NOT NULL,
+                  invoice_reference VARCHAR(255) NOT NULL,
+                  allocation_type VARCHAR(50) DEFAULT '',
+                  amount DECIMAL(16,2) DEFAULT 0,
+                  UNIQUE KEY uq_credit_note_allocation (credit_note_id, invoice_reference, allocation_type)
+                )"""
+            )
         connection.commit()
     finally:
         cursor.close()
@@ -257,6 +268,18 @@ def save_voucher_records(config: dict[str, object], table_name: str, records: li
                     cursor.execute(
                         "INSERT INTO receipt_allocations (receipt_id, bill_reference, allocation_type, amount) VALUES (%s, %s, %s, %s)",
                         (record["id"], allocation["bill_reference"], allocation["allocation_type"], allocation["amount"]),
+                    )
+        if table_name == "credit_notes_history":
+            for record in records:
+                cursor.execute("DELETE FROM credit_note_allocations WHERE credit_note_id = %s", (record["id"],))
+                merged = {}
+                for allocation in record.get("allocations", []):
+                    key = (allocation["bill_reference"], allocation["allocation_type"])
+                    merged[key] = merged.get(key, 0) + allocation["amount"]
+                for (invoice_reference, allocation_type), amount in merged.items():
+                    cursor.execute(
+                        "INSERT INTO credit_note_allocations (credit_note_id, invoice_reference, allocation_type, amount) VALUES (%s, %s, %s, %s)",
+                        (record["id"], invoice_reference, allocation_type, amount),
                     )
         connection.commit()
     finally:

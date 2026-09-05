@@ -828,6 +828,19 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
 .firm-wise-table th:nth-child(3), .firm-wise-table td:nth-child(3) { position: sticky; left: 250px; z-index: 3; box-shadow: 2px 0 0 #111827; }
 .firm-wise-table td:nth-child(-n+3) { background: #fff; }
 .firm-wise-table th:nth-child(-n+3) { background: #eef2f6; z-index: 4; }
+.credit-note-filters { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)) minmax(230px, 1.5fr) auto; gap: 10px; align-items: end; }
+.credit-search > div { position: relative; }
+.credit-search svg { position: absolute; left: 9px; top: 9px; color: #667085; }
+.credit-search input { padding-left: 30px; }
+.credit-note-kpis { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 8px; }
+.credit-note-shell { padding-top: 10px; }
+.credit-note-table { min-width: 1450px; }
+.credit-note-table th { padding: 0; }
+.credit-note-table th button { width: 100%; min-height: 38px; border: 0; padding: 7px 9px; color: inherit; background: transparent; font: inherit; font-weight: 800; text-align: left; cursor: pointer; }
+.credit-note-table th button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.credit-note-table th:first-child, .credit-note-table td:first-child { position: sticky; left: 0; z-index: 2; min-width: 270px; background: #fff; box-shadow: 2px 0 0 #111827; }
+.credit-note-table th:first-child { background: #eef2f6; z-index: 3; }
+.credit-note-table .narration-cell { max-width: 310px; overflow: hidden; text-overflow: ellipsis; }
 
 /* Target management */
 .target-page-title { display: flex; align-items: center; gap: 10px; }
@@ -967,6 +980,9 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .sales-person-filters, .sales-person-summary { grid-template-columns: 1fr; }
   .performance-filters, .performance-kpis { grid-template-columns: 1fr; }
   .firm-wise-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .credit-note-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .credit-note-filters .credit-search { grid-column: 1 / -1; }
+  .credit-note-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .target-filter-grid, .target-filter-grid.four-columns, .target-kpis { grid-template-columns: 1fr; }
   .target-entry-heading { align-items: flex-start; flex-direction: column; }
   .data-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -982,6 +998,10 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .data-filter-grid .filter-actions { grid-column: auto; }
   .filter-panel-title p { display: none; }
   .firm-wise-filters { grid-template-columns: 1fr; }
+  .credit-note-filters { grid-template-columns: 1fr; }
+  .credit-note-filters .credit-search { grid-column: auto; }
+  .credit-note-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .credit-note-kpis > :last-child { grid-column: 1 / -1; }
 }
 
 /* Tablet and mobile layout */
@@ -1103,6 +1123,8 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .firm-wise-report .master-title button { flex: 1; }
   .firm-wise-meta { padding-inline: 11px; flex-wrap: wrap; gap: 5px 12px; }
   .firm-wise-meta strong { width: 100%; }
+  .credit-note-report .master-title { align-items: stretch; flex-direction: column; gap: 9px; padding-bottom: 9px; }
+  .credit-note-report .master-title button { width: 100%; }
 }
 
 @media (max-width: 560px) {

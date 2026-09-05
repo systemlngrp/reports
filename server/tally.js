@@ -214,17 +214,20 @@ function normalizeSalesVoucher(voucher, firmName, voucherIndex) {
   })
 }
 
-function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
+export function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
   const date = normalizeDate(voucher.DATE)
   const voucherNo = stringValue(voucher.VOUCHERNUMBER || voucher.REFERENCE || `TALLY-${voucherIndex + 1}`)
   const party = stringValue(voucher.PARTYLEDGERNAME || voucher.LEDGERNAME || '')
   const amount = Math.abs(numberValue(voucher.AMOUNT || collectAmount(voucher)))
 
-  const allocations = collectByKey(voucher, 'BILLALLOCATIONS.LIST').map((row, index) => ({
-    billReference: stringValue(row.NAME || `allocation-${index + 1}`),
-    allocationType: stringValue(row.BILLTYPE || row.TYPE || ''),
-    amount: Math.abs(numberValue(row.AMOUNT)),
-  }))
+  const allocationMap = new Map()
+  collectByKey(voucher, 'BILLALLOCATIONS.LIST').forEach((row, index) => {
+    const billReference = stringValue(row.NAME || `allocation-${index + 1}`)
+    const allocationType = stringValue(row.BILLTYPE || row.TYPE || '')
+    const key = `${billReference}\u0000${allocationType}`
+    allocationMap.set(key, { billReference, allocationType, amount: (allocationMap.get(key)?.amount || 0) + Math.abs(numberValue(row.AMOUNT)) })
+  })
+  const allocations = [...allocationMap.values()]
   return {
     id: `${firmName}-${voucherType}-${voucherNo}-${voucherIndex}`,
     firm: firmName,

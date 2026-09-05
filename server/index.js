@@ -14,6 +14,7 @@ import {
   deleteTargets,
   ensureSchema,
   getCreditNoteHistory,
+  getCreditNoteAllocations,
   getCompanies,
   getExclusions,
   getFirms,
@@ -35,6 +36,7 @@ import { fetchOutstandingData, fetchVoucherData, testTallyConnection } from './t
 import { buildSalesReport, financialYearForDate, normalizeParty } from './sales-report.js'
 import { buildTargetPerformance, monthRange, weeksForMonth } from './target-performance.js'
 import { buildFirmWiseReport } from './firm-wise-report.js'
+import { buildCreditNoteReport } from './credit-note-report.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -119,6 +121,16 @@ app.get('/api/credit-notes-history', async (_req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message })
   }
+})
+
+app.get('/api/reporting/credit-notes', async (req, res) => {
+  try {
+    const [creditNotes, allocations, companies] = await Promise.all([getCreditNoteHistory(), getCreditNoteAllocations(), getCompanies()])
+    res.json(buildCreditNoteReport({ creditNotes, allocations, companies, filters: {
+      firm: String(req.query.firm || ''), financialYear: String(req.query.financialYear || ''), month: String(req.query.month || ''),
+      dealingPerson: String(req.query.dealingPerson || ''), refPerson: String(req.query.refPerson || ''), search: String(req.query.search || ''),
+    } }))
+  } catch (error) { res.status(400).json({ message: error.message }) }
 })
 
 app.get('/api/companies', async (_req, res) => {

@@ -33,6 +33,7 @@ import SalesPersonReport from './SalesPersonReport.jsx'
 import PerformanceReport from './PerformanceReport.jsx'
 import { CustomTarget, SalesManTargets, WeeklyMonthlyTargets } from './TargetReports.jsx'
 import FirmWiseReport from './FirmWiseReport.jsx'
+import CreditNoteReport from './CreditNoteReport.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
@@ -312,9 +313,7 @@ function App() {
             {active === 'intercompany' && <IntercompanySettings firms={firms} />}
             {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}
             {active === 'receipts' && <VoucherHistory firms={firms} title="Receipts Report" rows={receiptHistory} />}
-            {active === 'credit-notes' && (
-              <VoucherHistory firms={firms} title="Credit Notes Report" rows={creditNoteHistory} />
-            )}
+            {active === 'credit-notes' && <CreditNoteReport firms={firms} />}
             {active === 'firms' && <FirmSetup firms={firms} onSaved={setFirms} />}
             {active === 'history' && (
               <SalesHistory
