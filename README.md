@@ -29,7 +29,7 @@ The tracker can be saved through the browser's **Print / PDF** action or exporte
 
 ## Company Master Sync
 
-The **Master → Companies** page reads company records received at `POST /api/sync/companies`. Requests must send the configured `NPD_SYNC_SECRET` in the `X-Sync-Secret` header and identify the tab configured by `NPD_SYNC_ALLOWED_TAB` (normally `Companies`). Records are upserted by the sheet's `Id` column.
+The **Master → Companies** page reads company records received at `POST /api/npd-sync` (or the `/api/sync/companies` alias). Requests must send the configured `NPD_SYNC_SECRET` in the `x-npd-sync-secret` header and identify the tab configured by `NPD_SYNC_ALLOWED_TAB` (normally `Companies`). Records are upserted by the sheet's `Id` column. The endpoint supports the existing Apps Script `batch`, `full_batch_chunk`, and `full_finalize` response contract.
 
 ## Tally Setup
 

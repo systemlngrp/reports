@@ -120,21 +120,41 @@ app.get('/api/companies', async (_req, res) => {
   }
 })
 
-app.post('/api/sync/companies', async (req, res) => {
+app.post('/api/sync/companies', companySyncHandler)
+app.post('/api/npd-sync', companySyncHandler)
+
+async function companySyncHandler(req, res) {
   try {
     validateSyncRequest(req)
+    const syncMode = String(req.body?.syncMode || req.body?.mode || 'batch')
+    if (syncMode === 'full_finalize') {
+      const processedIds = Array.isArray(req.body?.processedIds) ? req.body.processedIds.map(String) : []
+      return res.json({ ok: true, success: true, syncMode, processedRows: processedIds.length, processedIds, inserted: 0, updated: 0, removed: 0, invalidRows: [], duplicateIds: [] })
+    }
     const rows = Array.isArray(req.body?.rows) ? req.body.rows : null
     if (!rows) throw new Error('A rows array is required.')
     const maximum = Number(process.env.COMPANY_SYNC_MAX_BATCH_SIZE || 500)
     if (rows.length > maximum) throw new Error(`A maximum of ${maximum} company rows can be synchronized at once.`)
     const companies = rows.map(normalizeCompanyRow)
     const result = await upsertCompanies(companies)
-    res.json({ success: true, mode: req.body.mode || 'partial', ...result })
+    const processedIds = companies.map((company) => company.id)
+    res.json({
+      ok: true,
+      success: true,
+      syncMode,
+      processedRows: result.synced,
+      processedIds,
+      inserted: 0,
+      updated: result.synced,
+      removed: 0,
+      invalidRows: [],
+      duplicateIds: [],
+    })
   } catch (error) {
     const status = error.code === 'SYNC_AUTH' ? 401 : error.code === 'SYNC_CONFIG' ? 503 : 400
-    res.status(status).json({ success: false, message: error.message })
+    res.status(status).json({ ok: false, success: false, message: error.message })
   }
-})
+}
 
 app.get('/api/reporting/ledgers', async (_req, res) => {
   try {
@@ -289,7 +309,7 @@ function validateSyncRequest(req) {
   if (!expectedSecret) throw syncError('NPD_SYNC_SECRET is not configured.', 'SYNC_CONFIG')
   const allowedTab = String(process.env.NPD_SYNC_ALLOWED_TAB || 'Companies')
   if (String(req.body?.tabName || '') !== allowedTab) throw new Error(`Only the ${allowedTab} tab may be synchronized.`)
-  const receivedSecret = String(req.get('X-Sync-Secret') || '')
+  const receivedSecret = String(req.get('x-npd-sync-secret') || req.get('X-Sync-Secret') || '')
   const expected = Buffer.from(expectedSecret)
   const received = Buffer.from(receivedSecret)
   if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
