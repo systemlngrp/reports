@@ -48,7 +48,13 @@ export async function fetchOutstandingData({ firm, asOfDate }) {
 export function parseOutstandingXml(xml) {
   const parsed = parser.parse(xml)
   const bills = collectByKey(parsed, 'BILL')
-  return bills.map((bill, index) => normalizeOutstandingBill(bill, index)).filter((row) => row.partyName && row.billReference && Number.isFinite(row.outstandingAmount))
+  const unique = new Map()
+  bills.forEach((bill, index) => {
+    const row = normalizeOutstandingBill(bill, index)
+    if (!row.partyName || !row.billReference || !Number.isFinite(row.outstandingAmount)) throw new Error(`Tally returned a malformed outstanding bill at row ${index + 1}.`)
+    unique.set(`${row.partyKey}\u0000${row.billReference}`, row)
+  })
+  return [...unique.values()]
 }
 
 async function postToTally(port, body) {
@@ -236,11 +242,11 @@ function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
 function normalizeOutstandingBill(bill, index) {
   const partyName = stringValue(bill.PARTYNAME || bill.PARENT || bill.LEDGERNAME)
   const billReference = stringValue(bill.BILLREFERENCE || bill.NAME || bill.REFERENCE || `bill-${index + 1}`)
-  const outstandingAmount = Math.abs(numberValue(bill.OUTSTANDINGAMOUNT || bill.CLOSINGBALANCE || bill.AMOUNT))
+  const outstandingAmount = numberValue(bill.OUTSTANDINGAMOUNT || bill.CLOSINGBALANCE || bill.AMOUNT)
   return {
     partyKey: partyName.trim().replace(/\s+/g, ' ').toLocaleLowerCase('en-IN'), partyName, billReference,
     billDate: normalizeDate(bill.BILLDATE || bill.DATE), dueDate: normalizeDate(bill.DUEDATE),
-    originalAmount: Math.abs(numberValue(bill.ORIGINALAMOUNT || bill.OPENINGBALANCE || bill.AMOUNT)),
+    originalAmount: numberValue(bill.ORIGINALAMOUNT || bill.OPENINGBALANCE || bill.AMOUNT),
     outstandingAmount, billStatus: stringValue(bill.BILLSTATUS || (outstandingAmount ? 'Outstanding' : 'Closed')),
   }
 }

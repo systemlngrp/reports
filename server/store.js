@@ -264,7 +264,7 @@ export async function getSalesHistory() {
 export async function getReceiptHistory() {
   const rows = await getVoucherHistory('receipts_history')
   const db = getPool()
-  const [allocations] = await db.query(`SELECT receipt_id AS receiptId, SUM(CASE WHEN LOWER(allocation_type) IN ('on account','onaccount','new ref') THEN ABS(amount) ELSE 0 END) AS onAccountAmount FROM receipt_allocations GROUP BY receipt_id`)
+  const [allocations] = await db.query(`SELECT receipt_id AS receiptId, SUM(CASE WHEN REPLACE(LOWER(allocation_type), ' ', '') = 'onaccount' THEN ABS(amount) ELSE 0 END) AS onAccountAmount FROM receipt_allocations GROUP BY receipt_id`)
   const amounts = new Map(allocations.map((row) => [row.receiptId, Number(row.onAccountAmount || 0)]))
   return rows.map((row) => ({ ...row, onAccountAmount: amounts.get(row.id) || 0 }))
 }
