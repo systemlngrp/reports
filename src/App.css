@@ -795,8 +795,30 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
 .company-pager select { width: 52px; min-height: 25px; }
 .company-pager button { min-height: 25px; border: 1px solid #111827; background: #fff; font-size: 10px; font-weight: 700; }
 .company-pager button:disabled { opacity: .45; }
+.sales-person-filters { display: grid; grid-template-columns: 150px 150px 210px minmax(260px, 1fr); gap: 10px; align-items: end; }
+.sales-person-filters fieldset { border: 1px solid #111827; border-radius: 2px; min-height: 31px; padding: 4px 9px; }
+.sales-person-filters legend { font-size: 9px; font-weight: 700; }
+.sales-person-summary { display: grid; grid-template-columns: 120px 140px minmax(150px, 1fr) repeat(4, minmax(150px, 1fr)); border: 1px solid #111827; }
+.sales-person-summary > div { border-right: 1px solid #111827; padding: 9px 10px; background: #fff8cc; }
+.sales-person-summary > div:nth-child(n+4) { background: #f2f7fb; }
+.sales-person-summary > div:last-child { border-right: 0; }
+.sales-person-summary span { display: block; font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.sales-person-summary strong { display: block; font-size: 13px; margin-top: 5px; }
+.sales-person-summary .positive { background: #dcfce7; }
+.sales-person-summary .negative { background: #fee2e2; }
+.sales-person-table { min-width: 1050px; }
+.positive-text { color: #047857; font-weight: 800; }
+.negative-text { color: #b91c1c; font-weight: 800; }
+.performance-filters { display: grid; grid-template-columns: repeat(3, minmax(180px, 240px)); gap: 12px; }
+.performance-kpis { display: grid; grid-template-columns: repeat(6, minmax(145px, 1fr)); gap: 8px; }
+.performance-kpis .positive { background: #dcfce7; }
+.performance-kpis .negative { background: #fee2e2; }
+.performance-table { min-width: 1250px; }
 
 @media (max-width: 980px) {
   .company-stats { grid-template-columns: repeat(2, 1fr); }
   .company-pager { align-items: flex-start; flex-direction: column; padding: 8px 0; }
+  .sales-person-filters, .sales-person-summary { grid-template-columns: 1fr; }
+  .performance-filters, .performance-kpis { grid-template-columns: 1fr; }
+  .sales-person-summary > div { border-right: 0; border-bottom: 1px solid #111827; }
 }

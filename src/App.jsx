@@ -27,11 +27,15 @@ import {
 import './App.css'
 import { IntercompanySettings, SalesTracker, TargetManagement } from './SalesTracker.jsx'
 import Companies from './Companies.jsx'
+import SalesPersonReport from './SalesPersonReport.jsx'
+import PerformanceReport from './PerformanceReport.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
   { id: 'reports', label: 'Reports', icon: ChartNoAxesCombined, children: [
     { id: 'sales-tracker', label: 'Sales Tracker', icon: ShoppingCart },
+    { id: 'sales-person', label: 'Sales Person Wise', icon: UsersRound },
+    { id: 'performance', label: 'Performance', icon: ChartNoAxesCombined },
   ] },
   { id: 'master', label: 'Master', icon: FileText, children: [
     { id: 'companies', label: 'Companies', icon: Building2 },
@@ -48,6 +52,8 @@ const navItems = [
 const pageThemes = {
   dashboard: 'theme-blue',
   'sales-tracker': 'theme-blue-cyan',
+  'sales-person': 'theme-blue-cyan',
+  performance: 'theme-blue-cyan',
   companies: 'theme-blue',
   targets: 'theme-cyan',
   intercompany: 'theme-red',
@@ -61,6 +67,8 @@ const pageThemes = {
 const pagePaths = {
   dashboard: '/dashbaord',
   'sales-tracker': '/sales-tracker',
+  'sales-person': '/sales-person',
+  performance: '/performance',
   companies: '/companies',
   targets: '/targets',
   intercompany: '/intercompany',
@@ -78,6 +86,8 @@ const routeAliases = {
   '/dashboard': 'dashboard',
   '/sales-tracker': 'sales-tracker',
   '/sales-by-month': 'sales-tracker',
+  '/sales-person': 'sales-person',
+  '/performance': 'performance',
   '/companies': 'companies',
   '/targets': 'targets',
   '/intercompany': 'intercompany',
@@ -114,7 +124,7 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(true)
-  const [openGroups, setOpenGroups] = useState({ reports: active === 'sales-tracker', master: active === 'companies' })
+  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance'].includes(active), master: active === 'companies' })
 
   useEffect(() => {
     loadInitialData()
@@ -267,6 +277,8 @@ function App() {
               />
             )}
             {active === 'sales-tracker' && <SalesTracker firms={firms} />}
+            {active === 'sales-person' && <SalesPersonReport firms={firms} />}
+            {active === 'performance' && <PerformanceReport firms={firms} />}
             {active === 'companies' && <Companies />}
             {active === 'targets' && <TargetManagement />}
             {active === 'intercompany' && <IntercompanySettings firms={firms} />}
