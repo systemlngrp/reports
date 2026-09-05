@@ -21,6 +21,12 @@ The React app calls the backend through `/api`. The backend runs on:
 http://localhost:4000
 ```
 
+## Sales Management Tracker
+
+Use **Customer Targets** to enter April–March targets and **Intercompany** to identify debtor ledgers that should be excluded. The **Sales Tracker** then reports gross sales, credit notes, exclusions, net sales, target achievement, customer performance, and the monthly matrix for an Indian financial year.
+
+The tracker can be saved through the browser's **Print / PDF** action or exported as a multi-sheet Excel workbook.
+
 ## Tally Setup
 
 In the app, open `Firms` and add each firm name with its Tally HTTP port number. Tally must be running on the same Windows PC, with HTTP/XML access available on those ports.

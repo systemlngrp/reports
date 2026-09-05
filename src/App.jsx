@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  ChartNoAxesCombined,
   CreditCard,
   Download,
   FileText,
@@ -18,13 +19,21 @@ import {
   Save,
   Search,
   ShoppingCart,
+  Target,
   Trash2,
+  UsersRound,
   XCircle,
 } from 'lucide-react'
 import './App.css'
+import { IntercompanySettings, SalesTracker, TargetManagement } from './SalesTracker.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
+  { id: 'reports', label: 'Reports', icon: ChartNoAxesCombined, children: [
+    { id: 'sales-tracker', label: 'Sales Tracker', icon: ShoppingCart },
+  ] },
+  { id: 'targets', label: 'Customer Targets', icon: Target },
+  { id: 'intercompany', label: 'Intercompany', icon: UsersRound },
   { id: 'sales', label: 'Sales', icon: ShoppingCart },
   { id: 'receipts', label: 'Receipts', icon: Receipt },
   { id: 'credit-notes', label: 'Credit Notes', icon: CreditCard },
@@ -34,6 +43,9 @@ const navItems = [
 
 const pageThemes = {
   dashboard: 'theme-blue',
+  'sales-tracker': 'theme-blue-cyan',
+  targets: 'theme-cyan',
+  intercompany: 'theme-red',
   sales: 'theme-red',
   receipts: 'theme-cyan',
   'credit-notes': 'theme-blue-red',
@@ -43,6 +55,9 @@ const pageThemes = {
 
 const pagePaths = {
   dashboard: '/dashbaord',
+  'sales-tracker': '/sales-tracker',
+  targets: '/targets',
+  intercompany: '/intercompany',
   sales: '/Sales',
   receipts: '/receipt',
   'credit-notes': '/creditnote',
@@ -55,6 +70,10 @@ const routeAliases = {
   '/dasboard': 'dashboard',
   '/dashbaord': 'dashboard',
   '/dashboard': 'dashboard',
+  '/sales-tracker': 'sales-tracker',
+  '/sales-by-month': 'sales-tracker',
+  '/targets': 'targets',
+  '/intercompany': 'intercompany',
   '/sales': 'sales',
   '/Sales': 'sales',
   '/receipt': 'receipts',
@@ -88,6 +107,7 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(true)
+  const [reportsOpen, setReportsOpen] = useState(active === 'sales-tracker')
 
   useEffect(() => {
     loadInitialData()
@@ -165,6 +185,20 @@ function App() {
         <nav className="nav-list" aria-label="Main navigation">
           {navItems.map((item) => {
             const Icon = item.icon
+            if (item.children) {
+              const childActive = item.children.some((child) => child.id === active)
+              return (
+                <div className="nav-group" key={item.id}>
+                  <button className={childActive ? 'nav-item active' : 'nav-item'} onClick={() => setReportsOpen((current) => !current)} type="button">
+                    <Icon size={18} /><span>{item.label}</span><ChevronRight className={reportsOpen ? 'nav-chevron open' : 'nav-chevron'} size={16} />
+                  </button>
+                  {reportsOpen && <div className="nav-children">{item.children.map((child) => {
+                    const ChildIcon = child.icon
+                    return <button className={active === child.id ? 'nav-item active' : 'nav-item'} key={child.id} onClick={() => navigate(child.id)} type="button"><ChildIcon size={16} /><span>{child.label}</span></button>
+                  })}</div>}
+                </div>
+              )
+            }
             return (
               <button
                 className={active === item.id ? 'nav-item active' : 'nav-item'}
@@ -193,7 +227,7 @@ function App() {
         <header className="topbar">
           <div>
             <p className="eyebrow">Local Tally reporting</p>
-            <h1>{navItems.find((item) => item.id === active)?.label}</h1>
+            <h1>{navItems.flatMap((item) => item.children || item).find((item) => item.id === active)?.label}</h1>
           </div>
           <div className="topbar-actions">
             <button
@@ -225,6 +259,9 @@ function App() {
                 salesHistory={salesHistory}
               />
             )}
+            {active === 'sales-tracker' && <SalesTracker firms={firms} />}
+            {active === 'targets' && <TargetManagement />}
+            {active === 'intercompany' && <IntercompanySettings firms={firms} />}
             {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}
             {active === 'receipts' && <VoucherHistory firms={firms} title="Receipts Report" rows={receiptHistory} />}
             {active === 'credit-notes' && (

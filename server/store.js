@@ -62,6 +62,30 @@ export async function ensureSchema() {
   await createVoucherTable(db, 'receipts_history')
   await createVoucherTable(db, 'credit_notes_history')
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS customer_targets (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      customer_key VARCHAR(255) NOT NULL,
+      customer_name VARCHAR(255) NOT NULL,
+      financial_year VARCHAR(7) NOT NULL,
+      fiscal_month TINYINT UNSIGNED NOT NULL,
+      amount DECIMAL(16, 2) NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_customer_target (customer_key, financial_year, fiscal_month)
+    )
+  `)
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS intercompany_exclusions (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      firm VARCHAR(255) NOT NULL,
+      party_key VARCHAR(255) NOT NULL,
+      party_name VARCHAR(255) NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_intercompany_party (firm, party_key)
+    )
+  `)
+
   await removePresetData(db)
 
   return { mode: 'mysql' }
@@ -245,6 +269,74 @@ export async function appendReceiptHistory(records) {
 
 export async function appendCreditNoteHistory(records) {
   return appendVoucherHistory('credit_notes_history', records)
+}
+
+export async function getTargets(financialYear) {
+  const db = getPool()
+  const params = []
+  let where = ''
+  if (financialYear) {
+    where = 'WHERE financial_year = ?'
+    params.push(financialYear)
+  }
+  const [rows] = await db.query(`
+    SELECT id, customer_key AS customerKey, customer_name AS customerName,
+      financial_year AS financialYear, fiscal_month AS fiscalMonth, amount
+    FROM customer_targets ${where}
+    ORDER BY customer_name, fiscal_month
+  `, params)
+  return rows
+}
+
+export async function upsertTargets({ customerKey, customerName, financialYear, months }) {
+  const db = getPool()
+  for (let index = 0; index < 12; index += 1) {
+    await db.query(`
+      INSERT INTO customer_targets (customer_key, customer_name, financial_year, fiscal_month, amount)
+      VALUES (?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE customer_name = VALUES(customer_name), amount = VALUES(amount)
+    `, [customerKey, customerName, financialYear, index + 1, months[index]])
+  }
+  return getTargets(financialYear)
+}
+
+export async function deleteTargets(customerKey, financialYear) {
+  const db = getPool()
+  const [result] = await db.query(
+    'DELETE FROM customer_targets WHERE customer_key = ? AND financial_year = ?',
+    [customerKey, financialYear],
+  )
+  return { deleted: result.affectedRows }
+}
+
+export async function getExclusions() {
+  const db = getPool()
+  const [rows] = await db.query(`
+    SELECT id, firm, party_key AS partyKey, party_name AS partyName
+    FROM intercompany_exclusions ORDER BY firm, party_name
+  `)
+  return rows
+}
+
+export async function upsertExclusion({ firm, partyKey, partyName }) {
+  const db = getPool()
+  await db.query(`
+    INSERT INTO intercompany_exclusions (firm, party_key, party_name)
+    VALUES (?, ?, ?)
+    ON DUPLICATE KEY UPDATE party_name = VALUES(party_name)
+  `, [firm, partyKey, partyName])
+  const [rows] = await db.query(`
+    SELECT id, firm, party_key AS partyKey, party_name AS partyName
+    FROM intercompany_exclusions WHERE firm = ? AND party_key = ?
+  `, [firm, partyKey])
+  return rows[0]
+}
+
+export async function deleteExclusion(id) {
+  const db = getPool()
+  const [result] = await db.query('DELETE FROM intercompany_exclusions WHERE id = ?', [id])
+  if (!result.affectedRows) throw new Error('Intercompany exclusion not found.')
+  return { id }
 }
 
 async function appendVoucherHistory(tableName, records) {

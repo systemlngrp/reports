@@ -161,6 +161,12 @@
   color: #ffffff;
 }
 
+.nav-group { display: grid; gap: 5px; }
+.nav-chevron { margin-left: auto; transition: transform 160ms ease; }
+.nav-chevron.open { transform: rotate(90deg); }
+.nav-children { display: grid; gap: 4px; padding-left: 16px; }
+.nav-children .nav-item { min-height: 38px; font-size: 14px; }
+
 .nav-item.active {
   box-shadow: inset 3px 0 0 var(--accent-alt);
 }
@@ -625,4 +631,107 @@ td.num {
   .workspace {
     padding: 18px;
   }
+}
+
+.button-row,
+.chart-legend,
+.firm-checks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-filters {
+  display: grid;
+  grid-template-columns: 160px 160px 190px minmax(280px, 1fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.report-filters fieldset {
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  min-height: 42px;
+  padding: 7px 12px;
+}
+
+.report-filters legend {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.firm-checks label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.firm-checks input { width: auto; min-height: auto; }
+
+.tracker-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.report-metric {
+  background: linear-gradient(145deg, #ffffff, var(--accent-soft));
+  border: 1px solid #d9e2ef;
+  border-left: 5px solid #64748b;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.report-metric span { display: block; color: #64748b; font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.report-metric strong { display: block; color: #172033; font-size: 22px; margin-top: 8px; }
+.report-metric.primary { border-left-color: #175cd3; }
+.report-metric.positive { border-left-color: #039855; }
+.report-metric.negative { border-left-color: #d92d20; }
+
+.chart-panel { padding-bottom: 14px; }
+.bar-chart { height: 250px; display: flex; align-items: end; gap: 12px; padding: 24px 18px 0; border-bottom: 1px solid #cbd5e1; }
+.bar-group { height: 100%; flex: 1; min-width: 38px; display: grid; grid-template-rows: 1fr 24px; text-align: center; color: #526070; font-size: 11px; font-weight: 700; }
+.bars { display: flex; justify-content: center; align-items: end; gap: 3px; min-height: 0; }
+.bar { display: block; width: min(18px, 42%); min-height: 1px; border-radius: 3px 3px 0 0; }
+.sales-bar, .legend-sales { background: #175cd3; }
+.target-bar, .legend-target { background: #f59e0b; }
+.chart-legend { justify-content: center; margin-top: 12px; }
+.chart-legend span { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.chart-legend i { width: 12px; height: 12px; border-radius: 2px; }
+
+.tracker-table { min-width: 1250px; }
+.matrix-table { min-width: 1800px; }
+.customer-name { font-weight: 700; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.status-number.positive { color: #027a48; font-weight: 800; }
+.status-number.negative, td.negative { color: #b42318; font-weight: 800; }
+.total-row td { background: var(--accent-soft); color: var(--accent-strong); font-weight: 800; border-top: 2px solid var(--accent); }
+
+.target-editor { display: grid; grid-template-columns: 180px minmax(260px, 1fr) auto; gap: 16px; align-items: end; }
+.target-editor .month-inputs { grid-column: 1 / -1; }
+.month-inputs { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 12px; }
+.exclusion-form { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 2fr) auto; gap: 14px; align-items: end; }
+
+@media (max-width: 980px) {
+  .report-filters, .tracker-kpis, .target-editor, .exclusion-form { grid-template-columns: 1fr; }
+  .month-inputs { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+  .target-editor .month-inputs { grid-column: auto; }
+}
+
+@media print {
+  @page { size: A4 landscape; margin: 9mm; }
+  body { background: #fff; font-size: 9px; }
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .app-shell { display: block; background: #fff; }
+  .workspace { padding: 0; }
+  .stack { gap: 8px; }
+  .panel, .report-metric { box-shadow: none; break-inside: avoid; }
+  .tracker-kpis { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+  .report-metric { padding: 7px; }
+  .report-metric strong { font-size: 13px; }
+  .bar-chart { height: 125px; }
+  .table-wrap { overflow: visible; }
+  table, .tracker-table, .matrix-table { min-width: 0; font-size: 7px; }
+  th, td { padding: 4px; white-space: normal; }
 }
