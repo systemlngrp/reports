@@ -836,6 +836,18 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
 .sales-person-summary .positive { background: #dcfce7; }
 .sales-person-summary .negative { background: #fee2e2; }
 .sales-person-table { min-width: 1050px; }
+.sales-person-report { gap: 10px; }
+.sales-person-report > .master-title { min-height: 34px; justify-content: flex-end; border-bottom: 0; }
+.sales-person-report > .master-title > h2 { display: none; }
+.sales-person-report .sales-person-filters { padding: 9px; border-color: #d0d5dd; background: #fff; }
+.sales-person-report .sales-person-summary { grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 8px; border: 0; }
+.sales-person-report .sales-person-summary > div { min-height: 48px; padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 3px; background: #f7f9fb; }
+.sales-person-report .sales-person-summary > div:nth-child(-n+3) { display: none; }
+.sales-person-report .sales-person-summary > div.positive { color: #047857; background: #ecfdf3; border-color: #86efac; }
+.sales-person-report .sales-person-summary > div.negative { color: #b91c1c; background: #fef2f2; border-color: #fca5a5; }
+.sales-person-report .company-table-shell { padding-top: 0; border-color: #d0d5dd; }
+.sales-person-report .sales-person-table th { background: #f1f5f9; }
+.sales-person-report .sales-person-table tbody tr:hover td { background: #f8fafc; }
 .positive-text { color: #047857; font-weight: 800; }
 .negative-text { color: #b91c1c; font-weight: 800; }
 .performance-filters { display: grid; grid-template-columns: repeat(3, minmax(180px, 240px)); gap: 12px; }
@@ -1066,6 +1078,16 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .item-wise-filters .credit-search { grid-column: auto; }
   .credit-note-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .credit-note-kpis > :last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 980px) {
+  .sales-person-report .sales-person-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .sales-person-report .sales-person-summary { grid-template-columns: 1fr; }
+  .sales-person-report > .master-title .button-row { width: 100%; }
+  .sales-person-report > .master-title button { flex: 1; }
 }
 
 /* Tablet and mobile layout */
