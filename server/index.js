@@ -240,6 +240,7 @@ app.get('/api/reporting/target-performance', async (req, res) => {
     const firm = requiredText(req.query.firm, 'Firm')
     const financialYear = validFinancialYear(req.query.financialYear)
     const salesPerson = String(req.query.salesPerson || '').trim()
+    const salesPersons = typeof req.query.salesPersons === 'string' ? req.query.salesPersons.split(',').map((value) => value.trim()).filter(Boolean) : []
     const fiscalMonth = req.query.fiscalMonth ? validFiscalMonth(req.query.fiscalMonth) : 0
     const asOfDate = String(req.query.asOfDate || new Date().toISOString().slice(0, 10))
     if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) throw new Error('As-of date must use YYYY-MM-DD.')
@@ -247,11 +248,11 @@ app.get('/api/reporting/target-performance', async (req, res) => {
       getSalesHistory(), getCreditNoteHistory(), getCompanies(), getSalesPersonTargets({ firm, financialYear }),
     ])
     let weeklyTargets = []
-    if (salesPerson && fiscalMonth) {
+    if (fiscalMonth) {
       const range = monthRange(financialYear, fiscalMonth)
-      weeklyTargets = await getWeeklySalesTargets({ firm, salesPerson, startDate: range.startDate, endDate: range.endDate })
+      weeklyTargets = await getWeeklySalesTargets({ firm, salesPerson: salesPerson || '', startDate: range.startDate, endDate: range.endDate })
     }
-    res.json(buildTargetPerformance({ sales, creditNotes, companies, monthlyTargets, weeklyTargets, firm, financialYear, salesPerson, fiscalMonth, asOfDate }))
+    res.json(buildTargetPerformance({ sales, creditNotes, companies, monthlyTargets, weeklyTargets, firm, financialYear, salesPerson, salesPersons, fiscalMonth, asOfDate }))
   } catch (error) { res.status(400).json({ message: error.message }) }
 })
 

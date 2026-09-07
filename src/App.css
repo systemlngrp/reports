@@ -1280,3 +1280,19 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .embedded-trend .bar-chart { height: 150px; min-width: 560px; }
   .embedded-trend { overflow-x: auto; }
 }
+
+.business-tracker .tracker-data-panel .table-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+}
+.business-tracker .tracker-data-panel .table-heading > div:first-child {
+  min-width: 0;
+}
+.business-tracker .report-icon-actions {
+  margin-left: auto;
+  flex: 0 0 auto;
+  align-self: center;
+}
