@@ -29,7 +29,7 @@ import {
 import './App.css'
 import { IntercompanySettings, SalesTracker } from './SalesTracker.jsx'
 import Companies from './Companies.jsx'
-import SalesPersonReport from './SalesPersonReport.jsx'
+import SalesPersonReport from './SalesPersonReportSearchable.jsx'
 import PerformanceReport from './PerformanceReport.jsx'
 import { CustomTarget, SalesManTargets, WeeklyMonthlyTargets } from './TargetReports.jsx'
 import FirmWiseReport from './FirmWiseReport.jsx'
