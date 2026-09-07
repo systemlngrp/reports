@@ -841,6 +841,12 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
 .credit-note-table th:first-child, .credit-note-table td:first-child { position: sticky; left: 0; z-index: 2; min-width: 270px; background: #fff; box-shadow: 2px 0 0 #111827; }
 .credit-note-table th:first-child { background: #eef2f6; z-index: 3; }
 .credit-note-table .narration-cell { max-width: 310px; overflow: hidden; text-overflow: ellipsis; }
+.credit-firm-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 2px; border-bottom: 2px solid #cbd5e1; }
+.credit-firm-tabs button { flex: 0 0 auto; border: 1px solid #cbd5e1; border-bottom: 0; border-radius: 7px 7px 0 0; padding: 9px 15px; color: #475467; background: #f8fafc; font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.credit-firm-tabs button:hover { color: var(--accent-strong); background: #fff; }
+.credit-firm-tabs button.active { margin-bottom: -2px; color: var(--accent-strong); background: #fff; border-color: var(--accent); border-bottom: 2px solid #fff; }
+.credit-view-filters { display: grid; grid-template-columns: repeat(4, minmax(145px, 1fr)) minmax(230px, 1.5fr) auto; gap: 10px; align-items: end; }
+.credit-view-table { min-width: 1320px; }
 
 /* Target management */
 .target-page-title { display: flex; align-items: center; gap: 10px; }
@@ -982,6 +988,8 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .firm-wise-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .credit-note-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .credit-note-filters .credit-search { grid-column: 1 / -1; }
+  .credit-view-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .credit-view-filters .credit-search { grid-column: 1 / -1; }
   .credit-note-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .target-filter-grid, .target-filter-grid.four-columns, .target-kpis { grid-template-columns: 1fr; }
   .target-entry-heading { align-items: flex-start; flex-direction: column; }
@@ -1000,6 +1008,8 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .firm-wise-filters { grid-template-columns: 1fr; }
   .credit-note-filters { grid-template-columns: 1fr; }
   .credit-note-filters .credit-search { grid-column: auto; }
+  .credit-view-filters { grid-template-columns: 1fr; }
+  .credit-view-filters .credit-search { grid-column: auto; }
   .credit-note-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .credit-note-kpis > :last-child { grid-column: 1 / -1; }
 }

@@ -130,7 +130,7 @@ function buildVoucherRequest(voucherType, fromDate, toDate) {
         <TDLMESSAGE>
           <COLLECTION NAME="VoucherCollection" ISMODIFY="No">
             <TYPE>Voucher</TYPE>
-            <FETCH>Date,VoucherNumber,PartyLedgerName,VoucherTypeName,InventoryEntries.*,AllInventoryEntries.*,AccountingEntries.*,LedgerEntries.*</FETCH>
+            <FETCH>Date,VoucherNumber,Reference,PartyLedgerName,LedgerName,VoucherTypeName,Narration,Amount,InventoryEntries.*,AllInventoryEntries.*,AccountingEntries.*,LedgerEntries.*</FETCH>
             <FILTER>VoucherTypeFilter</FILTER>
           </COLLECTION>
           <SYSTEM TYPE="Formulae" NAME="VoucherTypeFilter">$VoucherTypeName = "${voucherType}"</SYSTEM>
