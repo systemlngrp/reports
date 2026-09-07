@@ -36,6 +36,7 @@ import FirmWiseReport from './FirmWiseReport.jsx'
 import CreditNoteReport from './CreditNoteReport.jsx'
 import CreditNoteView from './CreditNoteView.jsx'
 import ItemWiseSales from './ItemWiseSales.jsx'
+import TargetMaster from './TargetMaster.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
@@ -51,6 +52,7 @@ const navItems = [
     { id: 'companies', label: 'Companies', icon: Building2 },
   ] },
   { id: 'target-menu', label: 'Target', icon: Target, children: [
+    { id: 'target-master', label: 'Target Master', icon: ClipboardList },
     { id: 'custom-target', label: 'Custom Target', icon: Target },
     { id: 'sales-man-target', label: 'Target by Sales Man', icon: UsersRound },
     { id: 'weekly-monthly-target', label: 'Sales Weekly Monthly Target', icon: CalendarDays },
@@ -75,6 +77,7 @@ const pageThemes = {
   'custom-target': 'theme-cyan',
   'sales-man-target': 'theme-cyan',
   'weekly-monthly-target': 'theme-cyan',
+  'target-master': 'theme-cyan',
   intercompany: 'theme-red',
   sales: 'theme-red',
   receipts: 'theme-cyan',
@@ -95,6 +98,7 @@ const pagePaths = {
   'custom-target': '/targets/custom',
   'sales-man-target': '/targets/sales-man',
   'weekly-monthly-target': '/targets/weekly-monthly',
+  'target-master': '/targets/master',
   intercompany: '/intercompany',
   sales: '/Sales',
   receipts: '/receipt',
@@ -120,6 +124,7 @@ const routeAliases = {
   '/targets/custom': 'custom-target',
   '/targets/sales-man': 'sales-man-target',
   '/targets/weekly-monthly': 'weekly-monthly-target',
+  '/targets/master': 'target-master',
   '/intercompany': 'intercompany',
   '/sales': 'sales',
   '/Sales': 'sales',
@@ -154,7 +159,7 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(() => window.innerWidth > 980)
-  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance', 'firm-wise', 'credit-note-view', 'item-wise-sales'].includes(active), master: active === 'companies', 'target-menu': ['custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
+  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance', 'firm-wise', 'credit-note-view', 'item-wise-sales'].includes(active), master: active === 'companies', 'target-menu': ['target-master', 'custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
 
   useEffect(() => {
     loadInitialData()
@@ -319,6 +324,7 @@ function App() {
             {active === 'custom-target' && <CustomTarget />}
             {active === 'sales-man-target' && <SalesManTargets firms={firms} />}
             {active === 'weekly-monthly-target' && <WeeklyMonthlyTargets firms={firms} />}
+            {active === 'target-master' && <TargetMaster firms={firms} />}
             {active === 'intercompany' && <IntercompanySettings firms={firms} />}
             {active === 'sales' && <SalesData firms={firms} rows={salesHistory} />}
             {active === 'receipts' && <VoucherHistory firms={firms} title="Receipts Report" rows={receiptHistory} />}

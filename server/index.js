@@ -274,6 +274,12 @@ app.put('/api/reporting/weekly-sales-targets', async (req, res) => {
   } catch (error) { res.status(400).json({ message: error.message }) }
 })
 
+app.get('/api/reporting/weekly-sales-targets', async (_req, res) => {
+  try {
+    res.json(await getWeeklySalesTargets())
+  } catch (error) { res.status(500).json({ message: error.message }) }
+})
+
 app.get('/api/reporting/exclusions', async (_req, res) => {
   try {
     res.json(await getExclusions())
