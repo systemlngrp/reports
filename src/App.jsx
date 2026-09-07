@@ -309,7 +309,7 @@ function App() {
                 salesHistory={salesHistory}
               />
             )}
-            {active === 'sales-tracker' && <SalesTracker firms={firms} />}
+            {active === 'sales-tracker' && <SalesTracker creditNotes={creditNoteHistory} firms={firms} sales={salesHistory} />}
             {active === 'sales-person' && <SalesPersonReport firms={firms} />}
             {active === 'performance' && <PerformanceReport firms={firms} />}
             {active === 'firm-wise' && <FirmWiseReport firms={firms} />}
