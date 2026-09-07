@@ -151,10 +151,82 @@ export async function ensureSchema() {
   await addColumnIfMissing(db, 'companies', 'dealing_person', "VARCHAR(255) DEFAULT ''")
   await addColumnIfMissing(db, 'companies', 'ref_person', "VARCHAR(255) DEFAULT ''")
 
+  await db.query(`CREATE TABLE IF NOT EXISTS app_users (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    display_name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )`)
+  await db.query(`CREATE TABLE IF NOT EXISTS user_menu_permissions (
+    user_id BIGINT UNSIGNED NOT NULL,
+    page_id VARCHAR(100) NOT NULL,
+    PRIMARY KEY (user_id, page_id),
+    CONSTRAINT fk_menu_user FOREIGN KEY (user_id) REFERENCES app_users(id) ON DELETE CASCADE
+  )`)
+  await db.query(`CREATE TABLE IF NOT EXISTS user_sessions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES app_users(id) ON DELETE CASCADE,
+    INDEX idx_session_expiry (expires_at)
+  )`)
+
   await removePresetData(db)
 
   return { mode: 'mysql' }
 }
+
+export async function countAdmins() {
+  const [rows] = await getPool().query('SELECT COUNT(*) AS count FROM app_users WHERE is_admin = TRUE')
+  return Number(rows[0].count)
+}
+
+export async function findUserByEmail(email) {
+  const [rows] = await getPool().query('SELECT id, email, display_name AS displayName, password_hash AS passwordHash, is_admin AS isAdmin, is_active AS isActive, must_change_password AS mustChangePassword FROM app_users WHERE email = ? LIMIT 1', [email])
+  return rows[0] || null
+}
+
+export async function findUserById(id) {
+  const [rows] = await getPool().query('SELECT id, email, display_name AS displayName, password_hash AS passwordHash, is_admin AS isAdmin, is_active AS isActive, must_change_password AS mustChangePassword, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS createdAt FROM app_users WHERE id = ? LIMIT 1', [id])
+  if (!rows[0]) return null
+  const [permissions] = await getPool().query('SELECT page_id AS pageId FROM user_menu_permissions WHERE user_id = ? ORDER BY page_id', [id])
+  return { ...rows[0], permissions: permissions.map((row) => row.pageId) }
+}
+
+export async function listUsers() {
+  const [rows] = await getPool().query('SELECT id, email, display_name AS displayName, is_admin AS isAdmin, is_active AS isActive, must_change_password AS mustChangePassword, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i:%s") AS createdAt FROM app_users ORDER BY display_name, email')
+  const [permissions] = await getPool().query('SELECT user_id AS userId, page_id AS pageId FROM user_menu_permissions ORDER BY page_id')
+  return rows.map((row) => ({ ...row, permissions: permissions.filter((item) => String(item.userId) === String(row.id)).map((item) => item.pageId) }))
+}
+
+export async function createUser({ email, displayName, passwordHash, isAdmin = false, mustChangePassword = true, permissions = [] }) {
+  const db = getPool()
+  const [result] = await db.query('INSERT INTO app_users (email, display_name, password_hash, is_admin, must_change_password) VALUES (?, ?, ?, ?, ?)', [email, displayName, passwordHash, Boolean(isAdmin), Boolean(mustChangePassword)])
+  await replaceUserPermissions(result.insertId, permissions)
+  return findUserById(result.insertId)
+}
+
+export async function updateUser(id, { email, displayName, isAdmin, isActive, permissions }) {
+  await getPool().query('UPDATE app_users SET email = ?, display_name = ?, is_admin = ?, is_active = ? WHERE id = ?', [email, displayName, Boolean(isAdmin), Boolean(isActive), id])
+  await replaceUserPermissions(id, permissions)
+  if (!isActive) await revokeUserSessions(id)
+  return findUserById(id)
+}
+
+export async function updateUserProfile(id, displayName) { await getPool().query('UPDATE app_users SET display_name = ? WHERE id = ?', [displayName, id]); return findUserById(id) }
+export async function setUserPassword(id, passwordHash, mustChangePassword) { await getPool().query('UPDATE app_users SET password_hash = ?, must_change_password = ? WHERE id = ?', [passwordHash, Boolean(mustChangePassword), id]); await revokeUserSessions(id) }
+export async function replaceUserPermissions(id, permissions) { const db = getPool(); await db.query('DELETE FROM user_menu_permissions WHERE user_id = ?', [id]); for (const page of permissions) await db.query('INSERT INTO user_menu_permissions (user_id, page_id) VALUES (?, ?)', [id, page]) }
+export async function createSession(userId, tokenHash, expiresAt) { await getPool().query('DELETE FROM user_sessions WHERE expires_at <= NOW()'); await getPool().query('INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)', [userId, tokenHash, expiresAt]) }
+export async function getSessionUser(tokenHash) { const [rows] = await getPool().query('SELECT user_id AS userId FROM user_sessions WHERE token_hash = ? AND expires_at > NOW() LIMIT 1', [tokenHash]); return rows[0] ? findUserById(rows[0].userId) : null }
+export async function deleteSession(tokenHash) { await getPool().query('DELETE FROM user_sessions WHERE token_hash = ?', [tokenHash]) }
+export async function revokeUserSessions(userId) { await getPool().query('DELETE FROM user_sessions WHERE user_id = ?', [userId]) }
 
 async function createVoucherTable(db, tableName) {
   await db.query(`

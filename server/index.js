@@ -37,13 +37,20 @@ import { buildSalesReport, financialYearForDate, normalizeParty } from './sales-
 import { buildTargetPerformance, monthRange, weeksForMonth } from './target-performance.js'
 import { buildFirmWiseReport } from './firm-wise-report.js'
 import { buildCreditNoteReport } from './credit-note-report.js'
+import {
+  authenticateApi,
+  authorizeApi,
+  initializeAuth,
+  registerProtectedAuthRoutes,
+  registerPublicAuthRoutes,
+} from './auth.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const port = Number(process.env.PORT || 4000)
 const distPath = path.join(__dirname, '..', 'dist')
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }))
+app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173', credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
 let storeMode = 'starting'
@@ -52,6 +59,10 @@ let startupError = ''
 app.get('/api/health', (_req, res) => {
   res.status(startupError ? 503 : 200).json({ ok: !startupError, storeMode, message: startupError })
 })
+
+registerPublicAuthRoutes(app)
+app.use('/api', authenticateApi, authorizeApi)
+registerProtectedAuthRoutes(app)
 
 app.get('/api/firms', async (_req, res) => {
   try {
@@ -529,8 +540,9 @@ function validatePort(port) {
 }
 
 ensureSchema()
-  .then((result) => {
+  .then(async (result) => {
     storeMode = result.mode
+    await initializeAuth()
   })
   .catch((error) => {
     storeMode = 'mysql-error'

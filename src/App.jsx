@@ -11,6 +11,7 @@ import {
   Download,
   FileText,
   History,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -20,10 +21,12 @@ import {
   Save,
   Search,
   SlidersHorizontal,
+  Settings,
   ShoppingCart,
   Target,
   Trash2,
   UsersRound,
+  UserCog,
   XCircle,
 } from 'lucide-react'
 import './App.css'
@@ -37,6 +40,7 @@ import CreditNoteReport from './CreditNoteReport.jsx'
 import CreditNoteView from './CreditNoteView.jsx'
 import ItemWiseSales from './ItemWiseSales.jsx'
 import TargetMaster from './TargetMaster.jsx'
+import { LoginPage, SettingsPage, UsersPage } from './AuthPages.jsx'
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: ClipboardList },
@@ -50,6 +54,8 @@ const navItems = [
   ] },
   { id: 'master', label: 'Master', icon: FileText, children: [
     { id: 'companies', label: 'Companies', icon: Building2 },
+    { id: 'users', label: 'Users', icon: UserCog, adminOnly: true },
+    { id: 'settings', label: 'Settings', icon: Settings, alwaysAllowed: true },
   ] },
   { id: 'target-menu', label: 'Target', icon: Target, children: [
     { id: 'target-master', label: 'Target Master', icon: ClipboardList },
@@ -74,6 +80,8 @@ const pageThemes = {
   'credit-note-view': 'theme-blue-red',
   'item-wise-sales': 'theme-blue-cyan',
   companies: 'theme-blue',
+  users: 'theme-blue',
+  settings: 'theme-blue',
   'custom-target': 'theme-cyan',
   'sales-man-target': 'theme-cyan',
   'weekly-monthly-target': 'theme-cyan',
@@ -95,6 +103,8 @@ const pagePaths = {
   'credit-note-view': '/reports/credit-note-view',
   'item-wise-sales': '/reports/item-wise-sales',
   companies: '/companies',
+  users: '/master/users',
+  settings: '/master/settings',
   'custom-target': '/targets/custom',
   'sales-man-target': '/targets/sales-man',
   'weekly-monthly-target': '/targets/weekly-monthly',
@@ -120,6 +130,9 @@ const routeAliases = {
   '/reports/credit-note-view': 'credit-note-view',
   '/reports/item-wise-sales': 'item-wise-sales',
   '/companies': 'companies',
+  '/master/users': 'users',
+  '/master/settings': 'settings',
+  '/settings': 'settings',
   '/targets': 'custom-target',
   '/targets/custom': 'custom-target',
   '/targets/sales-man': 'sales-man-target',
@@ -149,6 +162,8 @@ const emptyFilters = {
 const salesPageSize = 50
 
 function App() {
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [active, setActive] = useState(getPageFromPath)
   const [firms, setFirms] = useState([])
   const [salesHistory, setSalesHistory] = useState([])
@@ -159,11 +174,24 @@ function App() {
   const [error, setError] = useState('')
   const [health, setHealth] = useState(null)
   const [menuOpen, setMenuOpen] = useState(() => window.innerWidth > 980)
-  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance', 'firm-wise', 'credit-note-view', 'item-wise-sales'].includes(active), master: active === 'companies', 'target-menu': ['target-master', 'custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
+  const [openGroups, setOpenGroups] = useState({ reports: ['sales-tracker', 'sales-person', 'performance', 'firm-wise', 'credit-note-view', 'item-wise-sales'].includes(active), master: ['companies', 'users', 'settings'].includes(active), 'target-menu': ['target-master', 'custom-target', 'sales-man-target', 'weekly-monthly-target'].includes(active) })
 
   useEffect(() => {
-    loadInitialData()
+    loadSession()
   }, [])
+
+  async function loadSession() {
+    setAuthLoading(true)
+    try {
+      const user = await apiGet('/api/auth/me')
+      setCurrentUser(user)
+      if (!user.mustChangePassword) await loadInitialData(user)
+    } catch {
+      setCurrentUser(null)
+    } finally {
+      setAuthLoading(false)
+    }
+  }
 
   useEffect(() => {
     function handleRouteChange() {
@@ -183,16 +211,17 @@ function App() {
     }
   }
 
-  async function loadInitialData() {
+  async function loadInitialData(user = currentUser) {
     setLoading(true)
     setError('')
     try {
+      const may = (pages) => user?.isAdmin || pages.some((page) => user?.permissions?.includes(page))
       const [healthData, firmsData, historyData, receiptData, creditNoteData] = await Promise.all([
         apiGet('/api/health'),
         apiGet('/api/firms'),
-        apiGet('/api/sales-history'),
-        apiGet('/api/receipts-history'),
-        apiGet('/api/credit-notes-history'),
+        may(['sales', 'history', 'item-wise-sales']) ? apiGet('/api/sales-history') : [],
+        may(['receipts', 'firm-wise']) ? apiGet('/api/receipts-history') : [],
+        may(['credit-notes', 'credit-note-view', 'firm-wise']) ? apiGet('/api/credit-notes-history') : [],
       ])
       setHealth(healthData)
       setFirms(firmsData)
@@ -224,6 +253,32 @@ function App() {
     return { amount, qty }
   }, [filteredHistory])
 
+  const visibleNavItems = useMemo(() => navItems.map((item) => {
+    if (!item.children) return canAccess(currentUser, item) ? item : null
+    const children = item.children.filter((child) => canAccess(currentUser, child))
+    return children.length ? { ...item, children } : null
+  }).filter(Boolean), [currentUser])
+
+  useEffect(() => {
+    if (!currentUser || currentUser.mustChangePassword || canAccess(currentUser, { id: active, alwaysAllowed: active === 'settings', adminOnly: active === 'users' })) return
+    const first = visibleNavItems.flatMap((item) => item.children || item)[0]?.id || 'settings'
+    setActive(first)
+    window.history.replaceState({}, '', pagePaths[first])
+  }, [active, currentUser, visibleNavItems])
+
+  async function logout() {
+    try { await fetch('/api/auth/logout', { method: 'POST' }) } finally {
+      setCurrentUser(null)
+      setFirms([])
+      setSalesHistory([])
+      window.history.replaceState({}, '', '/login')
+    }
+  }
+
+  if (authLoading) return <div className="auth-screen"><div className="auth-card"><h2>Loading...</h2><p>Checking your secure session.</p></div></div>
+  if (!currentUser) return <LoginPage onLogin={(user) => { setCurrentUser(user); if (!user.mustChangePassword) loadInitialData(user); window.history.replaceState({}, '', user.mustChangePassword ? '/master/settings' : '/') }} />
+  if (currentUser.mustChangePassword) return <SettingsPage forced user={currentUser} onLogout={logout} onUserChange={(user) => { setCurrentUser(user); loadInitialData(user); window.history.replaceState({}, '', '/') }} />
+
   return (
     <div className={`app-shell ${pageThemes[active]} ${menuOpen ? '' : 'menu-collapsed'}`}>
       <aside className="sidebar">
@@ -242,7 +297,7 @@ function App() {
         </div>
 
         <nav className="nav-list" aria-label="Main navigation">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon
             if (item.children) {
               const childActive = item.children.some((child) => child.id === active)
@@ -290,11 +345,13 @@ function App() {
             {!menuOpen && <button className="show-menu-button" aria-label="Show menu" onClick={() => setMenuOpen(true)} title="Show menu" type="button"><PanelLeftOpen size={18} /></button>}
             <div>
               <p className="eyebrow">Local Tally reporting</p>
-              <h1>{navItems.flatMap((item) => item.children || item).find((item) => item.id === active)?.label}</h1>
+              <h1>{visibleNavItems.flatMap((item) => item.children || item).find((item) => item.id === active)?.label}</h1>
             </div>
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" onClick={loadInitialData} type="button" title="Refresh data">
+            <span className="signed-user">{currentUser.displayName}</span>
+            <button className="icon-button logout-button" onClick={logout} type="button" title="Logout"><LogOut size={18} /><span>Logout</span></button>
+            <button className="icon-button" onClick={() => loadInitialData()} type="button" title="Refresh data">
               <RefreshCw size={18} />
             </button>
           </div>
@@ -321,6 +378,8 @@ function App() {
             {active === 'credit-note-view' && <CreditNoteView firms={firms} />}
             {active === 'item-wise-sales' && <ItemWiseSales firms={firms} rows={salesHistory} />}
             {active === 'companies' && <Companies />}
+            {active === 'users' && <UsersPage currentUser={currentUser} />}
+            {active === 'settings' && <SettingsPage user={currentUser} onUserChange={setCurrentUser} />}
             {active === 'custom-target' && <CustomTarget />}
             {active === 'sales-man-target' && <SalesManTargets firms={firms} />}
             {active === 'weekly-monthly-target' && <WeeklyMonthlyTargets firms={firms} />}
@@ -551,6 +610,7 @@ function SalesData({ firms, rows }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(salesPageSize)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -563,7 +623,7 @@ function SalesData({ firms, rows }) {
 
   useEffect(() => {
     setPage(1)
-  }, [firm, fromDate, toDate])
+  }, [firm, fromDate, toDate, pageSize])
 
   function clearFilters() {
     setFirm('all')
@@ -577,19 +637,19 @@ function SalesData({ firms, rows }) {
     return { amount, qty }
   }, [filteredRows])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / salesPageSize))
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
 
   useEffect(() => {
     setPage((current) => Math.min(current, totalPages))
   }, [totalPages])
 
   const paginatedRows = useMemo(() => {
-    const start = (page - 1) * salesPageSize
-    return filteredRows.slice(start, start + salesPageSize)
-  }, [filteredRows, page])
+    const start = (page - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [filteredRows, page, pageSize])
 
-  const showingStart = filteredRows.length ? (page - 1) * salesPageSize + 1 : 0
-  const showingEnd = Math.min(page * salesPageSize, filteredRows.length)
+  const showingStart = filteredRows.length ? (page - 1) * pageSize + 1 : 0
+  const showingEnd = Math.min(page * pageSize, filteredRows.length)
   const activeFilterCount = Number(firm !== 'all') + Number(Boolean(fromDate)) + Number(Boolean(toDate))
 
   return (
@@ -660,6 +720,7 @@ function SalesData({ firms, rows }) {
             Showing {showingStart}-{showingEnd} of {filteredRows.length}
           </span>
           <div className="pagination-controls">
+            <label>Rows <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}><option>25</option><option>50</option><option>100</option></select></label>
             <button
               className="secondary-button"
               disabled={page === 1}
@@ -692,6 +753,8 @@ function VoucherHistory({ firms, title, rows }) {
   const [firm, setFirm] = useState('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -701,6 +764,8 @@ function VoucherHistory({ firms, title, rows }) {
       return matchFirm && matchFrom && matchTo
     })
   }, [firm, fromDate, rows, toDate])
+
+  useEffect(() => { setPage(1) }, [firm, fromDate, toDate, pageSize])
 
   function clearFilters() {
     setFirm('all')
@@ -713,6 +778,12 @@ function VoucherHistory({ firms, title, rows }) {
   }, [filteredRows])
 
   const activeFilterCount = Number(firm !== 'all') + Number(Boolean(fromDate)) + Number(Boolean(toDate))
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const paginatedRows = filteredRows.slice((page - 1) * pageSize, page * pageSize)
+  const showingStart = filteredRows.length ? (page - 1) * pageSize + 1 : 0
+  const showingEnd = Math.min(page * pageSize, filteredRows.length)
+
+  useEffect(() => { setPage((current) => Math.min(current, totalPages)) }, [totalPages])
 
   return (
     <section className="stack">
@@ -776,7 +847,8 @@ function VoucherHistory({ firms, title, rows }) {
       </div>
 
       <div className="panel table-panel">
-        <VoucherRowsTable rows={filteredRows} />
+        <VoucherRowsTable rows={paginatedRows} />
+        <Pagination page={page} pageSize={pageSize} setPage={setPage} setPageSize={setPageSize} showingStart={showingStart} showingEnd={showingEnd} total={filteredRows.length} totalPages={totalPages} />
       </div>
     </section>
   )
@@ -966,6 +1038,8 @@ function FirmSetup({ firms, onSaved }) {
 }
 
 function SalesHistory({ firms, filters, rows, setFilters, totals }) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }))
   }
@@ -989,6 +1063,13 @@ function SalesHistory({ firms, filters, rows, setFilters, totals }) {
     link.click()
     URL.revokeObjectURL(url)
   }
+
+  useEffect(() => { setPage(1) }, [filters, pageSize])
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const paginatedRows = rows.slice((page - 1) * pageSize, page * pageSize)
+  const showingStart = rows.length ? (page - 1) * pageSize + 1 : 0
+  const showingEnd = Math.min(page * pageSize, rows.length)
+  useEffect(() => { setPage((current) => Math.min(current, totalPages)) }, [totalPages])
 
   return (
     <section className="stack">
@@ -1051,10 +1132,15 @@ function SalesHistory({ firms, filters, rows, setFilters, totals }) {
       </div>
 
       <div className="panel table-panel">
-        <SalesRowsTable rows={rows} />
+        <SalesRowsTable rows={paginatedRows} />
+        <Pagination page={page} pageSize={pageSize} setPage={setPage} setPageSize={setPageSize} showingStart={showingStart} showingEnd={showingEnd} total={rows.length} totalPages={totalPages} />
       </div>
     </section>
   )
+}
+
+function Pagination({ page, pageSize, setPage, setPageSize, showingStart, showingEnd, total, totalPages }) {
+  return <div className="pagination-bar"><span>Showing {showingStart}-{showingEnd} of {total}</span><div className="pagination-controls"><label>Rows <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}><option>25</option><option>50</option><option>100</option></select></label><button className="secondary-button" disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))} type="button"><ChevronLeft size={16} /> Previous</button><strong>Page {page} / {totalPages}</strong><button className="secondary-button" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} type="button">Next <ChevronRight size={16} /></button></div></div>
 }
 
 function SalesRowsTable({ rows }) {
@@ -1230,6 +1316,13 @@ function formatNumber(value) {
 
 function csvValue(value) {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+function canAccess(user, item) {
+  if (!user) return false
+  if (item.alwaysAllowed) return true
+  if (item.adminOnly) return Boolean(user.isAdmin)
+  return Boolean(user.isAdmin || user.permissions?.includes(item.id))
 }
 
 function getPageFromPath() {
