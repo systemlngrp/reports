@@ -1152,7 +1152,7 @@ function Banner({ tone, message }) {
 
 function StatePanel({ icon, title, copy }) {
   return (
-    <div className="state-panel">
+    <div className={`state-panel ${title?.startsWith('Loading') ? 'loading-panel' : ''}`}>
       {icon}
       <h2>{title}</h2>
       <p>{copy}</p>
