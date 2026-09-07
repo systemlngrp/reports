@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { BarChart3, CalendarDays, Download, Plus, Printer, Save, Target, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { BarChart3, CalendarDays, Check, ChevronDown, Download, Plus, Printer, Save, Search, Target, Trash2 } from 'lucide-react'
 
 const months = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']
 
@@ -62,35 +62,62 @@ export function SalesTracker({ firms }) {
   }
 
   const views = [
-    { id: 'fy', label: 'FY Overview', icon: BarChart3, note: 'Executive performance' },
-    { id: 'month', label: 'Monthwise', icon: CalendarDays, note: 'Sales vs target' },
-    { id: 'week', label: 'Weekwise', icon: Target, note: 'Weekly execution' },
+    { id: 'fy', label: 'FY Overview', icon: BarChart3 },
+    { id: 'month', label: 'Monthwise', icon: CalendarDays },
+    { id: 'week', label: 'Weekwise', icon: Target },
   ]
 
   return <section className="stack tracker-page business-tracker">
-    <div className="panel tracker-hero">
-      <div><span className="tracker-eyebrow">Revenue Intelligence</span><h2>Sales Management Tracker</h2><p>Customer sales performance against plan for FY {financialYear}, updated through {asOfDate}.</p></div>
-      <div className="button-row no-print"><button className="secondary-button" onClick={() => window.print()} type="button"><Printer size={17} /> Print / PDF</button><button className="primary-button" disabled={!report} onClick={exportXlsx} type="button"><Download size={17} /> Export Excel</button></div>
-    </div>
+
     <nav className="tracker-view-tabs no-print" aria-label="Sales tracker sections">
-      {views.map(({ id, label, icon: Icon, note }) => <button className={reportView === id ? 'active' : ''} key={id} onClick={() => setReportView(id)} type="button"><Icon size={18} /><span><strong>{label}</strong><small>{note}</small></span></button>)}
+      {views.map(({ id, label, icon: Icon }) => <button className={reportView === id ? 'active' : ''} key={id} onClick={() => setReportView(id)} type="button"><Icon size={18} /><strong>{label}</strong></button>)}
     </nav>
     <div className="panel report-filters tracker-filter-bar no-print">
       <label>Financial Year<select value={financialYear} onChange={(event) => setFinancialYear(event.target.value)}>{yearOptions.map((year) => <option key={year}>{year}</option>)}</select></label>
       <label>As of Date<input value={asOfDate} onChange={(event) => setAsOfDate(event.target.value)} type="date" /></label>
       {reportView === 'week' && <label>Fiscal Month<select value={fiscalMonth} onChange={(event) => setFiscalMonth(Number(event.target.value))}>{months.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}</select></label>}
-      <fieldset><legend>Tally Firms</legend><div className="firm-checks">{firms.filter((firm) => firm.name).map((firm) => <label key={firm.id}><input checked={selectedFirms.includes(firm.name)} onChange={() => toggleFirm(firm.name)} type="checkbox" />{firm.name}</label>)}{!firms.some((firm) => firm.name) && <span>No configured firms</span>}</div></fieldset>
+      <FirmPicker firms={firms} selected={selectedFirms} onChange={setSelectedFirms} onToggle={toggleFirm} />
     </div>
     {status.error && <Message tone="danger">{status.error}</Message>}
     {status.loading && <div className="state-panel tracker-loading"><h2>Preparing business insights</h2><p>Calculating net sales, targets, achievement, and customer performance.</p></div>}
-    {!status.loading && report && <ReportBody report={report} view={reportView} />}
+    {!status.loading && report && <ReportBody onExport={exportXlsx} onPrint={() => window.print()} report={report} view={reportView} />}
   </section>
 }
 
-function ReportBody({ report, view }) {
+function FirmPicker({ firms, selected, onChange, onToggle }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const root = useRef(null)
+  const options = useMemo(() => firms.filter((firm) => firm.name), [firms])
+  const filtered = options.filter((firm) => firm.name.toLocaleLowerCase('en-IN').includes(query.trim().toLocaleLowerCase('en-IN')))
+  const label = !selected.length ? 'All Firms' : selected.length === 1 ? selected[0] : selected.length + ' Firms Selected'
+
+  useEffect(() => {
+    function close(event) { if (root.current && !root.current.contains(event.target)) setOpen(false) }
+    function escape(event) { if (event.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', escape)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', escape) }
+  }, [])
+
+  return <div className="firm-picker" ref={root}>
+    <span className="field-label">Tally Firms</span>
+    <button aria-expanded={open} className="firm-picker-trigger" onClick={() => setOpen((value) => !value)} type="button"><span title={label}>{label}</span><ChevronDown size={15} /></button>
+    {open && <div className="firm-picker-menu">
+      <div className="firm-search"><Search size={14} /><input autoFocus onChange={(event) => setQuery(event.target.value)} placeholder="Search firms..." value={query} /></div>
+      <div className="firm-picker-actions"><button onClick={() => onChange(options.map((firm) => firm.name))} type="button">Select All</button><button disabled={!selected.length} onClick={() => onChange([])} type="button">Clear</button></div>
+      <div className="firm-picker-options">{filtered.map((firm) => <button className={selected.includes(firm.name) ? 'selected' : ''} key={firm.id} onClick={() => onToggle(firm.name)} type="button"><span className="firm-check">{selected.includes(firm.name) && <Check size={12} />}</span><span>{firm.name}</span></button>)}{!filtered.length && <span className="firm-empty">No firms found</span>}</div>
+    </div>}
+  </div>
+}
+
+function ReportActions({ onPrint, onExport }) {
+  return <div className="report-icon-actions no-print"><button aria-label="Print or save as PDF" onClick={onPrint} title="Print / PDF" type="button"><Printer size={16} /></button><button aria-label="Export Excel" onClick={onExport} title="Export Excel" type="button"><Download size={16} /></button></div>
+}
+function ReportBody({ report, view, onExport, onPrint }) {
   if (!report.customers.length) return <Message tone="info">No sales, credit notes, or targets match these filters.</Message>
-  if (view === 'month') return <MonthlyMatrix customers={report.customers} />
-  if (view === 'week') return <WeeklyMatrix report={report} />
+  if (view === 'month') return <MonthlyMatrix customers={report.customers} onExport={onExport} onPrint={onPrint} />
+  if (view === 'week') return <WeeklyMatrix onExport={onExport} onPrint={onPrint} report={report} />
   const maximum = Math.max(1, ...report.monthly.flatMap((row) => [row.netSales, row.target]))
   const kpis = report.kpis
   return <>
@@ -103,27 +130,27 @@ function ReportBody({ report, view }) {
       <ReportMetric label="Achievement" value={percent(kpis.achievementPercent)} tone={kpis.achievementPercent >= 100 ? 'positive' : 'negative'} progress={kpis.achievementPercent} />
       <ReportMetric label="Shortfall / Excess" value={signedCurrency(kpis.shortfallExcess)} tone={kpis.shortfallExcess >= 0 ? 'positive' : 'negative'} />
     </div>
-    <div className="panel chart-panel"><div className="table-heading"><div><h2>Sales vs Target Trend</h2><p>April–March monthly performance</p></div></div><div className="bar-chart" role="img" aria-label="Monthly net sales and targets">{report.monthly.map((row) => <div className="bar-group" key={row.index} title={row.name + ': ' + currency(row.netSales) + ' net / ' + currency(row.target) + ' target'}><div className="bars"><i className="bar sales-bar" style={{ height: Math.max(0, row.netSales / maximum) * 100 + '%' }} /><i className="bar target-bar" style={{ height: Math.max(0, row.target / maximum) * 100 + '%' }} /></div><span>{row.name.slice(0, 3)}</span></div>)}</div><div className="chart-legend"><span><i className="legend-sales" />Net Sales</span><span><i className="legend-target" />Target</span></div></div>
-    <PerformanceTable customers={report.customers} />
+    <div className="panel chart-panel"><div className="table-heading"><div><h2>Sales vs Target Trend</h2><p>AprilÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œMarch monthly performance</p></div></div><div className="bar-chart" role="img" aria-label="Monthly net sales and targets">{report.monthly.map((row) => <div className="bar-group" key={row.index} title={row.name + ': ' + currency(row.netSales) + ' net / ' + currency(row.target) + ' target'}><div className="bars"><i className="bar sales-bar" style={{ height: Math.max(0, row.netSales / maximum) * 100 + '%' }} /><i className="bar target-bar" style={{ height: Math.max(0, row.target / maximum) * 100 + '%' }} /></div><span>{row.name.slice(0, 3)}</span></div>)}</div><div className="chart-legend"><span><i className="legend-sales" />Net Sales</span><span><i className="legend-target" />Target</span></div></div>
+    <PerformanceTable customers={report.customers} onExport={onExport} onPrint={onPrint} />
   </>
 }
 
-function PerformanceTable({ customers }) {
-  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><div><h2>Customer Performance</h2><p>FY-to-date commercial performance and contribution</p></div></div><div className="table-wrap"><table className="tracker-table"><thead><tr><th>Customer</th><th>Gross Sales</th><th>Credit Notes</th><th>Net Sales</th><th>Period Target</th><th>Contribution</th><th>Achievement</th><th>Shortfall / Excess</th></tr></thead><tbody>{customers.map((row) => <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td><Money value={row.grossSales} /><Money value={row.creditNotes} /><Money value={row.netSales} /><Money value={row.target} /><td className="num">{percent(row.contributionPercent)}</td><td className={'num status-number ' + (row.achievementPercent >= 100 ? 'positive' : 'negative')}><span className="achievement-pill">{percent(row.achievementPercent)}</span></td><td className={'num status-number ' + (row.shortfallExcess >= 0 ? 'positive' : 'negative')}>{signedCurrency(row.shortfallExcess)}</td></tr>)}</tbody></table></div></div>
+function PerformanceTable({ customers, onExport, onPrint }) {
+  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><h2>Customer Performance</h2><ReportActions onExport={onExport} onPrint={onPrint} /></div><div className="table-wrap"><table className="tracker-table"><thead><tr><th>Customer</th><th>Gross Sales</th><th>Credit Notes</th><th>Net Sales</th><th>Period Target</th><th>Contribution</th><th>Achievement</th><th>Shortfall / Excess</th></tr></thead><tbody>{customers.map((row) => <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td><Money value={row.grossSales} /><Money value={row.creditNotes} /><Money value={row.netSales} /><Money value={row.target} /><td className="num">{percent(row.contributionPercent)}</td><td className={'num status-number ' + (row.achievementPercent >= 100 ? 'positive' : 'negative')}><span className="achievement-pill">{percent(row.achievementPercent)}</span></td><td className={'num status-number ' + (row.shortfallExcess >= 0 ? 'positive' : 'negative')}>{signedCurrency(row.shortfallExcess)}</td></tr>)}</tbody></table></div></div>
 }
 
-function MonthlyMatrix({ customers }) {
+function MonthlyMatrix({ customers, onExport, onPrint }) {
   const salesTotals = months.map((_, index) => customers.reduce((sum, row) => sum + Number(row.months[index].netSales || 0), 0))
   const targetTotals = months.map((_, index) => customers.reduce((sum, row) => sum + Number(row.months[index].target || 0), 0))
-  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><div><h2>Monthwise Sales & Target</h2><p>Customer plan and actuals across the complete financial year</p></div></div><div className="table-wrap"><table className="matrix-table business-matrix"><thead><tr><th rowSpan="2">Customer</th>{months.map((month) => <th colSpan="2" key={month}>{month}</th>)}<th colSpan="2">FY Total</th></tr><tr>{months.map((month) => <PairHeaders key={month} />)}<PairHeaders /></tr></thead><tbody>{customers.map((row) => <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td>{row.months.map((month) => <PairCells key={month.index} sales={month.netSales} target={month.target} />)}<PairCells sales={row.netSales} target={row.months.reduce((sum, month) => sum + month.target, 0)} /></tr>)}<tr className="total-row"><td>Grand Total</td>{months.map((month, index) => <PairCells key={month} sales={salesTotals[index]} target={targetTotals[index]} />)}<PairCells sales={salesTotals.reduce(sum, 0)} target={targetTotals.reduce(sum, 0)} /></tr></tbody></table></div></div>
+  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><h2>Monthwise Sales & Target</h2><ReportActions onExport={onExport} onPrint={onPrint} /></div><div className="table-wrap"><table className="matrix-table business-matrix"><thead><tr><th rowSpan="2">Customer</th>{months.map((month) => <th colSpan="2" key={month}>{month}</th>)}<th colSpan="2">FY Total</th></tr><tr>{months.map((month) => <PairHeaders key={month} />)}<PairHeaders /></tr></thead><tbody>{customers.map((row) => <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td>{row.months.map((month) => <PairCells key={month.index} sales={month.netSales} target={month.target} />)}<PairCells sales={row.netSales} target={row.months.reduce((sum, month) => sum + month.target, 0)} /></tr>)}<tr className="total-row"><td>Grand Total</td>{months.map((month, index) => <PairCells key={month} sales={salesTotals[index]} target={targetTotals[index]} />)}<PairCells sales={salesTotals.reduce(sum, 0)} target={targetTotals.reduce(sum, 0)} /></tr></tbody></table></div></div>
 }
 
-function WeeklyMatrix({ report }) {
+function WeeklyMatrix({ report, onExport, onPrint }) {
   const weeks = report.weekly?.weeks || []
   const customers = report.customers
   const totalSales = customers.reduce((sumValue, row) => sumValue + row.weeks.reduce((weekSum, week) => weekSum + Number(week.netSales || 0), 0), 0)
   const totalTarget = customers.reduce((sumValue, row) => sumValue + row.weeks.reduce((weekSum, week) => weekSum + Number(week.target || 0), 0), 0)
-  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><div><h2>{report.weekly?.name} Weekly Sales & Target</h2><p>{shortDate(report.weekly?.startDate)} – {shortDate(report.weekly?.endDate)} · Monday–Sunday weeks clipped to month</p></div></div><div className="table-wrap"><table className="week-matrix business-matrix"><thead><tr><th rowSpan="2">Customer</th>{weeks.map((week) => <th colSpan="2" key={week.index}><span>Week {week.index}</span><small>{shortDate(week.startDate)} – {shortDate(week.endDate)}</small></th>)}<th colSpan="2">Month Total</th></tr><tr>{weeks.map((week) => <PairHeaders key={week.index} />)}<PairHeaders /></tr></thead><tbody>{customers.map((row) => { const sales = row.weeks.reduce((value, week) => value + Number(week.netSales || 0), 0), target = row.weeks.reduce((value, week) => value + Number(week.target || 0), 0); return <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td>{row.weeks.map((week) => <PairCells key={week.index} sales={week.netSales} target={week.target} />)}<PairCells sales={sales} target={target} /></tr> })}<tr className="total-row"><td>Grand Total</td>{weeks.map((week) => <PairCells key={week.index} sales={week.netSales} target={week.target} />)}<PairCells sales={totalSales} target={totalTarget} /></tr></tbody></table></div></div>
+  return <div className="panel table-panel tracker-data-panel"><div className="table-heading"><div><h2>{report.weekly?.name} Weekly Sales & Target</h2><span className="week-range">{shortDate(report.weekly?.startDate)} - {shortDate(report.weekly?.endDate)}</span></div><ReportActions onExport={onExport} onPrint={onPrint} /></div><div className="table-wrap"><table className="week-matrix business-matrix"><thead><tr><th rowSpan="2">Customer</th>{weeks.map((week) => <th colSpan="2" key={week.index}><span>Week {week.index}</span><small>{shortDate(week.startDate)} - {shortDate(week.endDate)}</small></th>)}<th colSpan="2">Month Total</th></tr><tr>{weeks.map((week) => <PairHeaders key={week.index} />)}<PairHeaders /></tr></thead><tbody>{customers.map((row) => { const sales = row.weeks.reduce((value, week) => value + Number(week.netSales || 0), 0), target = row.weeks.reduce((value, week) => value + Number(week.target || 0), 0); return <tr key={row.customerKey}><td className="customer-name">{row.customerName}</td>{row.weeks.map((week) => <PairCells key={week.index} sales={week.netSales} target={week.target} />)}<PairCells sales={sales} target={target} /></tr> })}<tr className="total-row"><td>Grand Total</td>{weeks.map((week) => <PairCells key={week.index} sales={week.netSales} target={week.target} />)}<PairCells sales={totalSales} target={totalTarget} /></tr></tbody></table></div></div>
 }
 
 function PairHeaders() { return <><th className="sales-heading">Sales</th><th className="target-heading">Target</th></> }
@@ -171,7 +198,7 @@ export function SalesByMonthReport({ firms }) {
   }
 
   return <section className="stack tracker-page">
-    <div className="panel split-panel report-heading"><div><h2>Sales by Month</h2><p>Customer-wise net sales across the Aprilâ€“March financial year.</p></div><div className="button-row no-print"><button className="secondary-button" onClick={() => window.print()} type="button"><Printer size={17} /> Print / PDF</button><button className="primary-button" disabled={!report} onClick={exportMonthly} type="button"><Download size={17} /> Export Excel</button></div></div>
+    <div className="panel split-panel report-heading"><div><h2>Sales by Month</h2><p>Customer-wise net sales across the AprilÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“March financial year.</p></div><div className="button-row no-print"><button className="secondary-button" onClick={() => window.print()} type="button"><Printer size={17} /> Print / PDF</button><button className="primary-button" disabled={!report} onClick={exportMonthly} type="button"><Download size={17} /> Export Excel</button></div></div>
     <div className="panel report-filters no-print"><label>Financial Year<select value={financialYear} onChange={(event) => setFinancialYear(event.target.value)}>{yearOptions.map((year) => <option key={year}>{year}</option>)}</select></label><label>As of Date<input value={asOfDate} onChange={(event) => setAsOfDate(event.target.value)} type="date" /></label><fieldset><legend>Tally Firms</legend><div className="firm-checks">{firms.filter((firm) => firm.name).map((firm) => <label key={firm.id}><input checked={selectedFirms.includes(firm.name)} onChange={() => toggleFirm(firm.name)} type="checkbox" />{firm.name}</label>)}</div></fieldset></div>
     {status.error && <Message tone="danger">{status.error}</Message>}
     {status.loading && <div className="state-panel"><h2>Preparing monthly report</h2><p>Aggregating customer sales for each financial-year month.</p></div>}
@@ -218,7 +245,7 @@ export function TargetManagement() {
     await apiDelete(`/api/reporting/targets/${encodeURIComponent(row.customerKey)}/${financialYear}`); setMessage('Target removed.'); await load()
   }
   const annual = values.reduce((sum, value) => sum + (Number(value) || 0), 0)
-  return <section className="stack"><div className="panel split-panel"><div><h2>Customer Targets</h2><p>Maintain Aprilâ€“March monthly targets; the annual total is calculated automatically.</p></div></div>
+  return <section className="stack"><div className="panel split-panel"><div><h2>Customer Targets</h2><p>Maintain AprilÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“March monthly targets; the annual total is calculated automatically.</p></div></div>
     {message && <Message tone={message.includes('saved') || message.includes('removed') ? 'success' : 'danger'}>{message}</Message>}
     <div className="panel target-editor"><label>Financial Year<select value={financialYear} onChange={(event) => setFinancialYear(event.target.value)}>{yearOptions.map((year) => <option key={year}>{year}</option>)}</select></label><label>Customer<select value={customerName} onChange={(event) => selectCustomer(event.target.value)}><option value="">Select a customer</option>{ledgers.map((name) => <option key={name}>{name}</option>)}</select></label>
       <div className="button-row"><button className="secondary-button" onClick={equalSplit} type="button">Equal Split</button><strong>Annual: {currency(annual)}</strong></div>

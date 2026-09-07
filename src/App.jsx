@@ -218,6 +218,9 @@ function App() {
             <strong>Report</strong>
             <span>Tally Data Center</span>
           </div>
+          <button className="brand-menu-toggle" aria-label="Hide menu" onClick={() => setMenuOpen(false)} title="Hide menu" type="button">
+            <PanelLeftClose size={18} />
+          </button>
           <button className="mobile-menu-close" aria-label="Close menu" onClick={() => setMenuOpen(false)} type="button">
             <XCircle size={20} />
           </button>
@@ -268,20 +271,14 @@ function App() {
 
       <main className="workspace">
         <header className="topbar">
-          <div>
-            <p className="eyebrow">Local Tally reporting</p>
-            <h1>{navItems.flatMap((item) => item.children || item).find((item) => item.id === active)?.label}</h1>
+          <div className="topbar-title">
+            {!menuOpen && <button className="show-menu-button" aria-label="Show menu" onClick={() => setMenuOpen(true)} title="Show menu" type="button"><PanelLeftOpen size={18} /></button>}
+            <div>
+              <p className="eyebrow">Local Tally reporting</p>
+              <h1>{navItems.flatMap((item) => item.children || item).find((item) => item.id === active)?.label}</h1>
+            </div>
           </div>
           <div className="topbar-actions">
-            <button
-              className="menu-button"
-              onClick={() => setMenuOpen((current) => !current)}
-              type="button"
-              title={menuOpen ? 'Hide menu' : 'Show menu'}
-            >
-              {menuOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-              {menuOpen ? 'Hide Menu' : 'Show Menu'}
-            </button>
             <button className="icon-button" onClick={loadInitialData} type="button" title="Refresh data">
               <RefreshCw size={18} />
             </button>
