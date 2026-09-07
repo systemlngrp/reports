@@ -4,7 +4,7 @@ import { Download, RotateCcw, Search } from 'lucide-react'
 const pageSize = 50
 const columns = [
   ['mainAccount', 'Main Account'], ['date', 'Dated'], ['amount', 'Credits'], ['narration', 'Narration'],
-  ['invoiceReference', 'Invoice No.'], ['voucherNo', 'Credit Note No.'], ['dealingPerson', 'Dealing Person'],
+  ['invoiceReference', 'Invoice No.'], ['voucherNo', 'Credit Note No.'], ['dealingPerson', 'Salesman'],
   ['month', 'Month'], ['financialYear', 'FY'],
 ]
 
@@ -12,7 +12,7 @@ export default function CreditNoteView({ firms }) {
   const firmNames = useMemo(() => [...new Set(firms.map((firm) => firm.name).filter(Boolean))], [firms])
   const [activeFirm, setActiveFirm] = useState(() => firmNames[0] || '')
   const today = new Date().toISOString().slice(0, 10)
-  const initialFilters = useMemo(() => ({ financialYear: financialYear(today), month: monthName(today), dealingPerson: '', refPerson: '', search: '' }), [today])
+  const initialFilters = useMemo(() => ({ financialYear: financialYear(today), month: monthName(today), dealingPerson: '', search: '' }), [today])
   const [filters, setFilters] = useState(initialFilters)
   const [report, setReport] = useState(null)
   const [status, setStatus] = useState({ loading: Boolean(activeFirm), error: '' })
@@ -41,7 +41,7 @@ export default function CreditNoteView({ firms }) {
   const sortedRows = useMemo(() => [...(report?.rows || [])].sort((a, b) => compare(a[sort.key], b[sort.key]) * sort.direction), [report, sort])
   const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize))
   const visible = sortedRows.slice((page - 1) * pageSize, page * pageSize)
-  const options = report?.options || { financialYears: [], months: [], dealingPeople: [], refPeople: [] }
+  const options = report?.options || { financialYears: [], months: [], dealingPeople: [] }
 
   function update(key, value) { setFilters((current) => ({ ...current, [key]: value })) }
   function changeSort(key) { setSort((current) => ({ key, direction: current.key === key ? -current.direction : 1 })) }
@@ -61,7 +61,7 @@ export default function CreditNoteView({ firms }) {
   return <section className="stack credit-note-view">
     <div className="master-title"><div><h2>CREDIT NOTE VIEW</h2><p>Spreadsheet-style credit-note register by firm.</p></div><button className="primary-button" disabled={!report?.rows.length} onClick={exportExcel} type="button"><Download size={15} /> Export Excel</button></div>
     <div className="credit-firm-tabs" role="tablist" aria-label="Credit note firms">{firmNames.map((firm) => <button aria-selected={firm === activeFirm} className={firm === activeFirm ? 'active' : ''} key={firm} onClick={() => setActiveFirm(firm)} role="tab" type="button">{firm}</button>)}</div>
-    <div className="panel credit-view-filters"><Select label="Financial Year" value={filters.financialYear} values={unique([filters.financialYear, ...options.financialYears])} onChange={(value) => update('financialYear', value)} all="All Years" /><Select label="Month" value={filters.month} values={unique([filters.month, ...options.months], false)} onChange={(value) => update('month', value)} all="All Months" /><Select label="Dealing Person" value={filters.dealingPerson} values={options.dealingPeople} onChange={(value) => update('dealingPerson', value)} all="All Dealing Persons" /><Select label="Ref. Person" value={filters.refPerson} values={options.refPeople} onChange={(value) => update('refPerson', value)} all="All Ref. Persons" /><label className="credit-search">Search<div><Search size={14} /><input value={filters.search} onChange={(event) => update('search', event.target.value)} placeholder="Customer, invoice or narration" /></div></label><button className="secondary-button" onClick={reset} type="button"><RotateCcw size={14} /> Reset</button></div>
+    <div className="panel credit-view-filters"><Select label="Financial Year" value={filters.financialYear} values={unique([filters.financialYear, ...options.financialYears])} onChange={(value) => update('financialYear', value)} all="All Years" /><Select label="Month" value={filters.month} values={unique([filters.month, ...options.months], false)} onChange={(value) => update('month', value)} all="All Months" /><Select label="Salesman" value={filters.dealingPerson} values={options.dealingPeople} onChange={(value) => update('dealingPerson', value)} all="All Salesmen" /><label className="credit-search">Search<div><Search size={14} /><input value={filters.search} onChange={(event) => update('search', event.target.value)} placeholder="Customer, invoice or narration" /></div></label><button className="secondary-button" onClick={reset} type="button"><RotateCcw size={14} /> Reset</button></div>
     {status.error && <div className="banner danger">{status.error}</div>}
     {report?.unmatched.length > 0 && <div className="banner info">Unmatched company ledgers ({report.unmatched.length}): {report.unmatched.slice(0, 8).join(', ')}{report.unmatched.length > 8 ? '…' : ''}</div>}
     <div className="credit-note-kpis"><Kpi label="Filtered Rows" value={report?.summary.rowCount || 0} /><Kpi label="Credit Note Amount" value={currency(report?.summary.totalAmount)} /><Kpi label="Customers" value={report?.summary.customerCount || 0} /></div>

@@ -130,7 +130,7 @@ function buildVoucherRequest(voucherType, fromDate, toDate) {
         <TDLMESSAGE>
           <COLLECTION NAME="VoucherCollection" ISMODIFY="No">
             <TYPE>Voucher</TYPE>
-            <FETCH>Date,VoucherNumber,Reference,PartyLedgerName,LedgerName,VoucherTypeName,Narration,Amount,InventoryEntries.*,AllInventoryEntries.*,AccountingEntries.*,LedgerEntries.*</FETCH>
+            <FETCH>Date,VoucherNumber,Reference,PartyLedgerName,LedgerName,VoucherTypeName,Narration,BasicNarration,Amount,InventoryEntries.*,AllInventoryEntries.*,AccountingEntries.*,LedgerEntries.*</FETCH>
             <FILTER>VoucherTypeFilter</FILTER>
           </COLLECTION>
           <SYSTEM TYPE="Formulae" NAME="VoucherTypeFilter">$VoucherTypeName = "${voucherType}"</SYSTEM>
@@ -236,7 +236,7 @@ export function normalizeVoucher(voucher, firmName, voucherType, voucherIndex) {
     voucherNo,
     voucherType,
     amount,
-    narration: stringValue(voucher.NARRATION || ''),
+    narration: stringValue(voucher.NARRATION || voucher.BASICNARRATION || ''),
     source: 'tally',
     allocations,
   }

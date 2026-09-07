@@ -155,7 +155,7 @@ def build_voucher_request(voucher_type: str, from_date: str, to_date: str) -> st
         <TDLMESSAGE>
           <COLLECTION NAME="VoucherCollection" ISMODIFY="No">
             <TYPE>Voucher</TYPE>
-            <FETCH>Date,VoucherNumber,Reference,PartyLedgerName,LedgerName,VoucherTypeName,Narration,Amount,AccountingEntries.*,LedgerEntries.*</FETCH>
+            <FETCH>Date,VoucherNumber,Reference,PartyLedgerName,LedgerName,VoucherTypeName,Narration,BasicNarration,Amount,AccountingEntries.*,LedgerEntries.*</FETCH>
             <FILTER>VoucherTypeFilter</FILTER>
           </COLLECTION>
           <SYSTEM TYPE="Formulae" NAME="VoucherTypeFilter">$VoucherTypeName = "{voucher_type}"</SYSTEM>
@@ -197,7 +197,7 @@ def normalize_voucher(voucher: ET.Element, firm_name: str, voucher_type: str, vo
         "voucher_no": voucher_no,
         "voucher_type": text_of(voucher, "VOUCHERTYPENAME") or voucher_type,
         "amount": abs(number_value(text_of(voucher, "AMOUNT")) or collect_amount(voucher)),
-        "narration": text_of(voucher, "NARRATION"),
+        "narration": text_of(voucher, "NARRATION") or text_of(voucher, "BASICNARRATION"),
         "source": "tally",
         "allocations": allocations,
     }
