@@ -306,10 +306,11 @@ app.get('/api/reporting/sales-tracker', async (req, res) => {
     const financialYear = String(req.query.financialYear || financialYearForDate(asOfDate))
     const fiscalMonth = req.query.fiscalMonth == null ? null : validFiscalMonth(req.query.fiscalMonth)
     const firms = typeof req.query.firms === 'string' ? req.query.firms.split(',').filter(Boolean) : []
+    const selectedCustomers = typeof req.query.customers === 'string' ? req.query.customers.split(',').filter(Boolean) : []
     const [sales, creditNotes, targets, exclusions] = await Promise.all([
       getSalesHistory(), getCreditNoteHistory(), getTargets(financialYear), getExclusions(),
     ])
-    res.json(buildSalesReport({ sales, creditNotes, targets, exclusions, firms, financialYear, asOfDate, fiscalMonth }))
+    res.json(buildSalesReport({ sales, creditNotes, targets, exclusions, firms, financialYear, asOfDate, fiscalMonth, selectedCustomers }))
   } catch (error) {
     res.status(400).json({ message: error.message })
   }

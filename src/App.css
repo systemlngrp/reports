@@ -1258,3 +1258,25 @@ th { background: #eef2f6; color: #111827; font-size: 9px; }
   .business-tracker .tracker-view-tabs button { gap: 5px; padding-inline: 5px; }
   .business-tracker .tracker-view-tabs strong { font-size: 9px; }
 }
+
+/* Tracker graph, company filter, and collapsed workspace fixes */
+.app-shell.menu-collapsed { grid-template-columns: minmax(0, 1fr); }
+.app-shell.menu-collapsed .workspace { width: 100%; min-width: 0; max-width: none; box-sizing: border-box; }
+.app-shell.menu-collapsed .business-tracker,
+.app-shell.menu-collapsed .tracker-data-panel { width: 100%; min-width: 0; box-sizing: border-box; }
+.business-tracker .tracker-filter-bar { grid-template-columns: 170px 180px 170px minmax(205px, 1fr) minmax(225px, 1.2fr); }
+.report-icon-actions button.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+.embedded-trend { padding: 8px 12px 7px; border-bottom: 1px solid #d8e2ec; background: #fff; }
+.embedded-trend .bar-chart { height: 190px; padding-top: 14px; }
+.embedded-trend .chart-legend { margin-top: 7px; }
+.embedded-trend .negative-bar { background: #d92d20; }
+@media (max-width: 1180px) {
+  .business-tracker .tracker-filter-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .business-tracker .firm-picker { grid-column: auto; }
+}
+@media (max-width: 760px) {
+  .business-tracker .tracker-filter-bar { grid-template-columns: 1fr; }
+  .business-tracker .firm-picker { grid-column: auto; }
+  .embedded-trend .bar-chart { height: 150px; min-width: 560px; }
+  .embedded-trend { overflow-x: auto; }
+}

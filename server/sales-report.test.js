@@ -67,3 +67,27 @@ test('builds customer weekly net sales and allocates the full monthly target by 
   assert.equal(report.customers[0].weeks.reduce((sum, week) => sum + week.target, 0), 3000)
   assert.equal(report.weekly.weeks[1].netSales, 800)
 })
+
+
+test('filters selected customers while preserving available company options', () => {
+  const report = buildSalesReport({
+    financialYear: '2026-27', asOfDate: '2026-04-30', fiscalMonth: 1,
+    sales: [
+      { firm: 'Firm A', debtor: 'ACME', date: '2026-04-07', amount: 1000 },
+      { firm: 'Firm A', debtor: 'Beta', date: '2026-04-08', amount: 500 },
+    ],
+    creditNotes: [{ firm: 'Firm A', party: 'ACME', date: '2026-04-09', amount: 100 }],
+    targets: [
+      { customerName: 'ACME', financialYear: '2026-27', fiscalMonth: 1, amount: 600 },
+      { customerName: 'Beta', financialYear: '2026-27', fiscalMonth: 1, amount: 300 },
+    ],
+    exclusions: [], selectedCustomers: [' acme '],
+  })
+  assert.deepEqual(report.availableCustomers, ['ACME', 'Beta'])
+  assert.equal(report.customers.length, 1)
+  assert.equal(report.kpis.grossSales, 1000)
+  assert.equal(report.kpis.creditNotes, 100)
+  assert.equal(report.kpis.netSales, 900)
+  assert.equal(report.monthly[0].target, 600)
+  assert.equal(report.weekly.weeks.reduce((sum, week) => sum + week.netSales, 0), 900)
+})

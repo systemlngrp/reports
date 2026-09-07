@@ -75,7 +75,7 @@ export function periodTargetAmount(monthlyTargets, financialYear, asOfDate) {
   }, 0)
 }
 
-export function buildSalesReport({ sales = [], creditNotes = [], targets = [], exclusions = [], firms = [], financialYear, asOfDate, fiscalMonth = null }) {
+export function buildSalesReport({ sales = [], creditNotes = [], targets = [], exclusions = [], firms = [], financialYear, asOfDate, fiscalMonth = null, selectedCustomers = [] }) {
   const { start, end } = financialYearBounds(financialYear)
   const cutoff = clampDate(asOfDate, start, end)
   const firmSet = new Set(firms.filter(Boolean))
@@ -149,8 +149,6 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     item.months[index].target += number(row.amount)
   }
 
-  let periodTarget = 0
-  let netSales = 0
   for (const item of customers.values()) {
     item.months.forEach((month) => { month.netSales = month.grossSales - month.creditNotes })
     if (weekPeriod) item.weeks.forEach((week) => {
@@ -161,13 +159,20 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     item.target = periodTargetAmount(item.months.map((month) => month.target), financialYear, cutoff)
     item.achievementPercent = item.target > 0 ? (item.netSales / item.target) * 100 : null
     item.shortfallExcess = item.netSales - item.target
-    netSales += item.netSales
-    periodTarget += item.target
   }
 
-  const rows = [...customers.values()]
+  const allRows = [...customers.values()]
+  const availableCustomers = allRows.map((item) => item.customerName).sort((a, b) => a.localeCompare(b))
+  const customerSet = new Set(selectedCustomers.map(normalizeParty).filter(Boolean))
+  const filteredRows = allRows.filter((item) => !customerSet.size || customerSet.has(item.customerKey))
+  const netSales = filteredRows.reduce((sum, item) => sum + item.netSales, 0)
+  const periodTarget = filteredRows.reduce((sum, item) => sum + item.target, 0)
+  const rows = filteredRows
     .map((item) => ({ ...item, contributionPercent: netSales ? (item.netSales / netSales) * 100 : 0 }))
     .sort((a, b) => b.netSales - a.netSales || a.customerName.localeCompare(b.customerName))
+  const filteredGrossSales = customerSet.size ? rows.reduce((sum, item) => sum + item.grossSales, 0) : grossSales
+  const filteredCreditNotes = customerSet.size ? rows.reduce((sum, item) => sum + item.creditNotes, 0) : creditNoteAmount
+  const filteredExclusions = customerSet.size ? 0 : intercompanyExclusions
 
   const monthly = fiscalMonths.map(({ index, name }) => {
     const values = rows.map((row) => row.months[index - 1])
@@ -189,11 +194,11 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
   } : null
 
   return {
-    filters: { financialYear, asOfDate: cutoff, firms: [...firmSet] },
+    filters: { financialYear, asOfDate: cutoff, firms: [...firmSet], customers: [...customerSet] },
     kpis: {
-      grossSales,
-      creditNotes: creditNoteAmount,
-      intercompanyExclusions,
+      grossSales: filteredGrossSales,
+      creditNotes: filteredCreditNotes,
+      intercompanyExclusions: filteredExclusions,
       netSales,
       periodTarget,
       achievementPercent: periodTarget > 0 ? (netSales / periodTarget) * 100 : null,
@@ -202,6 +207,7 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     monthly,
     weekly,
     customers: rows,
+    availableCustomers,
   }
 }
 
