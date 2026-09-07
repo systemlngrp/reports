@@ -49,3 +49,21 @@ test('keeps zero-target and negative-net customers without division errors', () 
   assert.equal(report.customers[0].achievementPercent, null)
   assert.equal(report.customers[0].shortfallExcess, -250)
 })
+
+
+test('builds customer weekly net sales and allocates the full monthly target by calendar day', () => {
+  const report = buildSalesReport({
+    financialYear: '2026-27', asOfDate: '2026-04-15', fiscalMonth: 1,
+    sales: [{ firm: 'Firm A', debtor: 'ACME', date: '2026-04-07', amount: 1000 }],
+    creditNotes: [{ firm: 'Firm A', party: 'ACME', date: '2026-04-08', amount: 200 }],
+    targets: [{ customerName: 'ACME', financialYear: '2026-27', fiscalMonth: 1, amount: 3000 }],
+    exclusions: [],
+  })
+  assert.deepEqual(report.weekly.weeks.map((week) => [week.startDate, week.endDate]), [
+    ['2026-04-01', '2026-04-05'], ['2026-04-06', '2026-04-12'], ['2026-04-13', '2026-04-19'],
+    ['2026-04-20', '2026-04-26'], ['2026-04-27', '2026-04-30'],
+  ])
+  assert.equal(report.customers[0].weeks[1].netSales, 800)
+  assert.equal(report.customers[0].weeks.reduce((sum, week) => sum + week.target, 0), 3000)
+  assert.equal(report.weekly.weeks[1].netSales, 800)
+})

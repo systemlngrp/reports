@@ -37,6 +37,30 @@ export function fiscalMonthIndex(value) {
   return month >= 4 ? month - 3 : month + 9
 }
 
+export function weeksForFiscalMonth(financialYear, fiscalMonth) {
+  const monthIndex = Number(fiscalMonth)
+  if (!Number.isInteger(monthIndex) || monthIndex < 1 || monthIndex > 12) throw new Error('Fiscal month must be between 1 and 12.')
+  const { startYear } = financialYearBounds(financialYear)
+  const calendarMonth = fiscalMonths[monthIndex - 1].calendarMonth
+  const year = calendarMonth >= 4 ? startYear : startYear + 1
+  const startDate = year + '-' + String(calendarMonth).padStart(2, '0') + '-01'
+  const endDate = new Date(Date.UTC(year, calendarMonth, 0)).toISOString().slice(0, 10)
+  const weeks = []
+  let cursor = startDate
+  while (cursor <= endDate) {
+    const date = parseDate(cursor)
+    const naturalEnd = new Date(date)
+    naturalEnd.setUTCDate(date.getUTCDate() + ((7 - date.getUTCDay()) % 7))
+    const naturalEndDate = naturalEnd.toISOString().slice(0, 10)
+    const end = naturalEndDate < endDate ? naturalEndDate : endDate
+    weeks.push({ index: weeks.length + 1, startDate: cursor, endDate: end, days: dayCount(cursor, end) })
+    const next = parseDate(end)
+    next.setUTCDate(next.getUTCDate() + 1)
+    cursor = next.toISOString().slice(0, 10)
+  }
+  return { fiscalMonth: monthIndex, name: fiscalMonths[monthIndex - 1].name, startDate, endDate, days: dayCount(startDate, endDate), weeks }
+}
+
 export function periodTargetAmount(monthlyTargets, financialYear, asOfDate) {
   const { start, end } = financialYearBounds(financialYear)
   const cutoff = clampDate(asOfDate, start, end)
@@ -51,13 +75,14 @@ export function periodTargetAmount(monthlyTargets, financialYear, asOfDate) {
   }, 0)
 }
 
-export function buildSalesReport({ sales = [], creditNotes = [], targets = [], exclusions = [], firms = [], financialYear, asOfDate }) {
+export function buildSalesReport({ sales = [], creditNotes = [], targets = [], exclusions = [], firms = [], financialYear, asOfDate, fiscalMonth = null }) {
   const { start, end } = financialYearBounds(financialYear)
   const cutoff = clampDate(asOfDate, start, end)
   const firmSet = new Set(firms.filter(Boolean))
   const includeFirm = (firm) => !firmSet.size || firmSet.has(firm)
   const exclusionSet = new Set(exclusions.map((row) => `${row.firm}\u0000${normalizeParty(row.partyName)}`))
   const customers = new Map()
+  const weekPeriod = fiscalMonth == null || fiscalMonth === '' ? null : weeksForFiscalMonth(financialYear, fiscalMonth)
 
   function customer(name) {
     const key = normalizeParty(name)
@@ -74,6 +99,7 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
         achievementPercent: null,
         shortfallExcess: 0,
         months: fiscalMonths.map(({ index, name }) => ({ index, name, grossSales: 0, creditNotes: 0, netSales: 0, target: 0 })),
+        weeks: weekPeriod?.weeks.map((week) => ({ ...week, grossSales: 0, creditNotes: 0, netSales: 0, target: 0 })) || [],
       })
     }
     return customers.get(key)
@@ -96,6 +122,8 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     const month = item.months[fiscalMonthIndex(row.date) - 1]
     item.grossSales += amount
     month.grossSales += amount
+    const week = item.weeks.find((value) => row.date >= value.startDate && row.date <= value.endDate)
+    if (week) week.grossSales += amount
   }
 
   for (const row of creditNotes) {
@@ -107,6 +135,8 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     const month = item.months[fiscalMonthIndex(row.date) - 1]
     item.creditNotes += amount
     month.creditNotes += amount
+    const week = item.weeks.find((value) => row.date >= value.startDate && row.date <= value.endDate)
+    if (week) week.creditNotes += amount
     creditNoteAmount += amount
   }
 
@@ -123,6 +153,10 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
   let netSales = 0
   for (const item of customers.values()) {
     item.months.forEach((month) => { month.netSales = month.grossSales - month.creditNotes })
+    if (weekPeriod) item.weeks.forEach((week) => {
+      week.netSales = week.grossSales - week.creditNotes
+      week.target = item.months[weekPeriod.fiscalMonth - 1].target * (week.days / weekPeriod.days)
+    })
     item.netSales = item.grossSales - item.creditNotes
     item.target = periodTargetAmount(item.months.map((month) => month.target), financialYear, cutoff)
     item.achievementPercent = item.target > 0 ? (item.netSales / item.target) * 100 : null
@@ -145,6 +179,15 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
     }
   })
 
+  const weekly = weekPeriod ? {
+    fiscalMonth: weekPeriod.fiscalMonth, name: weekPeriod.name, startDate: weekPeriod.startDate, endDate: weekPeriod.endDate,
+    weeks: weekPeriod.weeks.map((week) => ({
+      ...week,
+      netSales: rows.reduce((sum, row) => sum + Number(row.weeks[week.index - 1]?.netSales || 0), 0),
+      target: rows.reduce((sum, row) => sum + Number(row.weeks[week.index - 1]?.target || 0), 0),
+    })),
+  } : null
+
   return {
     filters: { financialYear, asOfDate: cutoff, firms: [...firmSet] },
     kpis: {
@@ -157,8 +200,13 @@ export function buildSalesReport({ sales = [], creditNotes = [], targets = [], e
       shortfallExcess: netSales - periodTarget,
     },
     monthly,
+    weekly,
     customers: rows,
   }
+}
+
+function dayCount(start, end) {
+  return Math.round((parseDate(end) - parseDate(start)) / 86400000) + 1
 }
 
 function parseDate(value) {
