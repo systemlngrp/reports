@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Download, Printer, Search } from 'lucide-react'
 
-const months = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']
+const months = ['All Months', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March']
 
 export default function SalesPersonReport({ firms }) {
   const today = new Date().toISOString().slice(0, 10), currentFy = fy(today)
-  const [year, setYear] = useState(currentFy), [month, setMonth] = useState(fiscalMonth(today)), [salesman, setSalesman] = useState('all')
+  const [year, setYear] = useState(currentFy), [month, setMonth] = useState(fiscalMonth(today) + 1), [salesman, setSalesman] = useState('all')
   const [selectedFirms, setSelectedFirms] = useState([]), [companies, setCompanies] = useState([]), [report, setReport] = useState(null)
   const [status, setStatus] = useState({ loading: true, error: '' }), firmFilter = selectedFirms.join('|'), monthName = months[month - 1]
   const load = useCallback(async () => {
     setStatus({ loading: true, error: '' })
     try {
-      const params = new URLSearchParams({ financialYear: year, asOfDate: monthEnd(year, month) }); if (firmFilter) params.set('firms', firmFilter.replaceAll('|', ','))
+      const params = new URLSearchParams({ financialYear: year, asOfDate: month === 1 ? `${Number(year.slice(0, 4)) + 1}-03-31` : monthEnd(year, month - 1) }); if (firmFilter) params.set('firms', firmFilter.replaceAll('|', ','))
       const [companyResponse, reportResponse] = await Promise.all([fetch('/api/companies'), fetch(`/api/reporting/sales-tracker?${params}`)])
       const [companyData, reportData] = await Promise.all([companyResponse.json(), reportResponse.json()])
       if (!companyResponse.ok) throw new Error(companyData.message || 'Unable to load companies.')
@@ -23,7 +23,7 @@ export default function SalesPersonReport({ firms }) {
   const people = useMemo(() => [...new Set(companies.map((row) => row.salesPerson).filter(Boolean))].sort(), [companies])
   const rows = useMemo(() => {
     if (!report) return []
-    const sales = new Map(report.customers.map((row) => [normalize(row.customerName), Number(row.months[month - 1]?.netSales || 0)]))
+    const sales = new Map(report.customers.map((row) => [normalize(row.customerName), month === 1 ? Number(row.netSales || 0) : Number(row.months[month - 2]?.netSales || 0)]))
     return companies.filter((row) => salesman === 'all' || row.salesPerson === salesman).map((row) => { const target = Number(row.target || 0), amount = sales.get(normalize(row.company)) || 0; return { ...row, target, amount, variance: amount - target, achievement: target ? amount / target * 100 : null } }).filter((row) => row.target || row.amount).sort((a, b) => a.salesPerson.localeCompare(b.salesPerson) || a.company.localeCompare(b.company))
   }, [companies, month, report, salesman])
   const totals = rows.reduce((sum, row) => ({ target: sum.target + row.target, sales: sum.sales + row.amount }), { target: 0, sales: 0 })
